@@ -3,9 +3,8 @@
 Sistem manajemen *leads* berbasis AI untuk **Mitsubishi DIPO**, terintegrasi dengan
 **WhatsApp Business** melalui **Meta WhatsApp Cloud API**.
 
-> **Status saat ini: Phase 2 — AI Agent & Knowledge Base** (menunggu persetujuan).
-> Backend, database, worker, simulator WhatsApp, AI Agent (Mock/Claude/OpenAI), dan
-> knowledge base sudah bisa dijalankan. Frontend belum dibuat. Lihat [ROADMAP.md](ROADMAP.md).
+> **Status saat ini: Phase 3 — Cold/Warm Tagging & Sales Routing** (implementasi di branch `development`, menunggu review dan pengujian).
+> Backend, database, simulator WhatsApp, AI Agent, knowledge base, dan fondasi routing tersedia. Frontend belum dibuat. Lihat [ROADMAP.md](ROADMAP.md).
 
 ## Mulai Cepat
 
