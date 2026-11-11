@@ -38,6 +38,7 @@ from app.models.enums import (
 from app.services.audit_service import record_audit
 from app.services.knowledge_service import KnowledgeService
 from app.services.message_service import MessageService
+from app.services.routing_service import RoutingService
 from app.services.qualification_service import (
     DecisionInput,
     decide,
@@ -258,7 +259,12 @@ class AutoReplyService:
         )
         message = await self._send(conversation, reply_text) if reply_text else None
         if decision.handover_reason:
-            await hand_over(self.session, conversation, state, lead, decision.handover_reason)
+            if decision.handover_reason == HandoverReason.QUALIFICATION_COMPLETE:
+                routing = await RoutingService(self.session).route_qualified_lead(lead, conversation)
+                target = ConversationHandler.SALES if routing.get("assigned") else ConversationHandler.ADMIN_QUEUE
+                await hand_over(self.session, conversation, state, lead, decision.handover_reason, to=target)
+            else:
+                await hand_over(self.session, conversation, state, lead, decision.handover_reason)
         await self.session.commit()
         return message
 
