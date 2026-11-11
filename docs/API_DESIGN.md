@@ -168,6 +168,7 @@ Akses daftar lead, riwayat assignment, dan master wilayah: admin/supervisor. Ass
 | GET | `/inbox` | login | Inbox diperkaya data customer/lead; sales hanya melihat percakapan yang ditugaskan kepadanya |
 | GET | `/dashboard/summary` | admin, supervisor | KPI leads cold/warm, percakapan aktif, antrean, dan percakapan sales |
 | GET | `/territory-mappings` | admin, supervisor | Daftar mapping wilayah-sales |
+| PATCH | `/agents/{agent_profile_id}` | admin | Ubah ketersediaan dan batas lead aktif sales |
 
 Balasan manusia tetap menggunakan `POST /conversations/{id}/messages`. Balasan manual mengambil alih percakapan sehingga AI berhenti. Admin dapat menugaskan lead ke sales melalui `POST /leads/{id}/assign`.
 
