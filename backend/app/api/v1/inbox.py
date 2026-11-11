@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session
 from app.models import Contact, Conversation, Lead, User
-from app.models.enums import ConversationStatus, RoleName
+from app.models.enums import RoleName
 
 router = APIRouter(prefix="/inbox", tags=["inbox"])
 
@@ -35,7 +35,9 @@ async def list_inbox(
             "id": str(conv.id),
             "contact_id": str(contact.id),
             "lead_id": str(lead.id) if lead else None,
-            "customer_name": (lead.full_name if lead and lead.full_name else contact.display_name) or "Customer",
+            "customer_name": (
+                lead.full_name if lead and lead.full_name else contact.display_name
+            ) or "Customer",
             "phone_number": contact.phone_number,
             "domicile": lead.domicile_raw if lead else None,
             "vehicle_interest": lead.vehicle_interest if lead else None,
