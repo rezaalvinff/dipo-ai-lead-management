@@ -2,7 +2,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_session, require_roles
@@ -167,3 +167,35 @@ async def delete_mapping(
                  entity_id=item.id, actor_type="user", actor_user_id=user.id)
     await session.delete(item)
     await session.commit()
+
+
+@router.get("/agents")
+async def list_agents(
+    active_only: bool = True,
+    _: User = Depends(staff),
+    session: AsyncSession = Depends(get_session),
+):
+    """List sales profiles and current active workload for assignment UI."""
+    query = select(AgentProfile, User).join(User, User.id == AgentProfile.user_id)
+    if active_only:
+        query = query.where(AgentProfile.is_available.is_(True), User.is_active.is_(True))
+    rows = (await session.execute(query.order_by(AgentProfile.display_name))).all()
+    result = []
+    for profile, user in rows:
+        active_count = await session.scalar(
+            select(func.count(Lead.id)).where(
+                Lead.assigned_agent_id == profile.id,
+                Lead.status.not_in(("won", "lost")),
+            )
+        )
+        result.append({
+            "id": str(profile.id),
+            "user_id": str(user.id),
+            "display_name": profile.display_name,
+            "phone_number": profile.phone_number,
+            "is_available": profile.is_available,
+            "user_is_active": user.is_active,
+            "max_active_leads": profile.max_active_leads,
+            "active_leads": active_count or 0,
+        })
+    return result
