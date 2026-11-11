@@ -19,8 +19,8 @@ from app.models.enums import (
     OUTBOUND_STATUS_RANK,
     MessageDirection,
     MessageStatus,
-    SenderType,
     ProviderName,
+    SenderType,
 )
 
 logger = logging.getLogger(__name__)
