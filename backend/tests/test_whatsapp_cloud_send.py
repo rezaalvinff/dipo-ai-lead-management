@@ -4,8 +4,7 @@ import httpx
 import pytest
 
 from app.adapters.whatsapp.cloud import WhatsAppCloudAdapter
-from app.core.config import AppEnv, WhatsAppProviderName
-from app.core.config import Settings
+from app.core.config import AppEnv, Settings, WhatsAppProviderName
 
 
 def _production_settings():
