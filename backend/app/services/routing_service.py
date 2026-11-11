@@ -60,7 +60,9 @@ class RoutingService:
 
         territory = await self._match_territory(lead.domicile_raw)
         if territory is None:
+            lead.territory_id = None
             return await self._send_to_admin_queue(lead, conversation, "territory_unmapped")
+        lead.territory_id = territory.id
 
         mappings = list(
             await self.session.scalars(
