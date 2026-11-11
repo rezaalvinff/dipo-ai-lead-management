@@ -15,7 +15,11 @@ from app.services.routing_service import RoutingService
 
 
 async def _make_lead(session, *, domicile="Medan", complete=True):
-    contact = Contact(phone_number="+6280000000123", display_name="Customer Dummy", is_simulated=True)
+    contact = Contact(
+        phone_number="+6280000000123",
+        display_name="Customer Dummy",
+        is_simulated=True,
+    )
     session.add(contact)
     await session.flush()
     lead = Lead(
@@ -42,11 +46,19 @@ async def _make_lead(session, *, domicile="Medan", complete=True):
 async def test_qualified_lead_routes_to_mapped_agent_and_becomes_warm(app, users):
     async with app.state.ctx.session_factory() as session:
         agent_user = await session.scalar(select(User).where(User.email == users["sales"]))
-        agent = await session.scalar(select(AgentProfile).where(AgentProfile.user_id == agent_user.id))
+        agent = await session.scalar(
+            select(AgentProfile).where(AgentProfile.user_id == agent_user.id)
+        )
         territory = Territory(name="Medan", aliases=["medan kota"], is_active=True)
         session.add(territory)
         await session.flush()
-        session.add(TerritoryMapping(territory_id=territory.id, agent_profile_id=agent.id, priority=1))
+        session.add(
+            TerritoryMapping(
+                territory_id=territory.id,
+                agent_profile_id=agent.id,
+                priority=1,
+            )
+        )
         lead, conversation = await _make_lead(session)
         await session.flush()
 
