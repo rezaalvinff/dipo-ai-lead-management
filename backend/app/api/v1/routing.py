@@ -7,7 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_session, require_roles
 from app.core.errors import ConflictError, NotFoundError
-from app.models import AgentProfile, Assignment, Lead, Territory, TerritoryMapping, User
+from app.models import (
+    AgentProfile,
+    Assignment,
+    Lead,
+    Territory,
+    TerritoryMapping,
+    User,
+)
 from app.models.enums import RoleName
 from app.schemas.routing import (
     ManualAssignRequest, TerritoryCreate, TerritoryMappingCreate, TerritoryMappingOut,
