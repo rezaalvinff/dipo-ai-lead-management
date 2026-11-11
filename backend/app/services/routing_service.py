@@ -19,7 +19,7 @@ from app.models import (
     TerritoryMapping,
     User,
 )
-from app.models.enums import ConversationHandler, LeadStatus, LeadTemperature
+from app.models.enums import ActorType, ConversationHandler, LeadStatus, LeadTemperature
 from app.services.audit_service import record_audit
 
 
@@ -152,7 +152,11 @@ class RoutingService:
         conversation.handler = ConversationHandler.ADMIN_QUEUE
         conversation.assigned_user_id = None
         record_audit(
-            self.session, action="lead.routing_queued", entity_type="lead", entity_id=lead.id,
+            self.session,
+            action="lead.routing_queued",
+            entity_type="lead",
+            entity_id=lead.id,
+            actor_type=ActorType.SYSTEM,
             data={"reason": reason, "domicile": lead.domicile_raw},
         )
         return {"assigned": False, "reason": reason, "queue": "admin_queue"}
