@@ -31,14 +31,20 @@ logger = logging.getLogger("seed")
 DUMMY_USERS = [
     ("Admin Dummy", "admin", None),
     ("Supervisor Dummy", "supervisor", None),
-    ("Sales Dummy Satu", "sales", "+6280000009001"),
-    ("Sales Dummy Dua", "sales", "+6280000009002"),
+    ("Sales Medan Dummy", "sales", "+6280000009001"),
+    ("Sales Jakarta Dummy", "sales", "+6280000009002"),
+    ("Sales Pekanbaru Dummy", "sales", "+6280000009003"),
+    ("Sales Surabaya Dummy", "sales", "+6280000009004"),
+    ("Sales Padang Dummy", "sales", "+6280000009005"),
 ]
 
+# Exact mapped areas only; nearby cities are never inferred.
 TERRITORIES = {
-    "Jakarta Selatan": ["jaksel", "jakarta selatan", "jkt selatan"],
-    "Bekasi": ["bekasi", "bks"],
-    "Depok": ["depok"],
+    "Medan": ["medan kota"],
+    "Jakarta": ["dki jakarta"],
+    "Pekanbaru": ["pekan baru"],
+    "Surabaya": ["sby"],
+    "Padang": ["kota padang"],
 }
 
 # Article placeholders are DRAFT: the AI never sees them until an admin
@@ -106,14 +112,29 @@ async def seed() -> None:
             territories[name] = territory
         await session.flush()
 
-        agents = list(await session.scalars(select(AgentProfile).order_by(AgentProfile.created_at)))
-        if agents and not await session.scalar(select(TerritoryMapping.id).limit(1)):
-            names = list(territories)
-            for index, name in enumerate(names):
-                agent = agents[index % len(agents)]
-                session.add(
-                    TerritoryMapping(territory_id=territories[name].id, agent_profile_id=agent.id)
-                )
+        # Ensure the five regional dummy agents are mapped to their exact territory.
+        # Existing mappings are preserved; seed can safely be run more than once.
+        for territory_name, agent_name in (
+            ("Medan", "Sales Medan Dummy"),
+            ("Jakarta", "Sales Jakarta Dummy"),
+            ("Pekanbaru", "Sales Pekanbaru Dummy"),
+            ("Surabaya", "Sales Surabaya Dummy"),
+            ("Padang", "Sales Padang Dummy"),
+        ):
+            agent_user = await session.scalar(select(User).where(User.full_name == agent_name))
+            if agent_user is None or agent_user.agent_profile is None:
+                continue
+            territory = territories[territory_name]
+            exists = await session.scalar(select(TerritoryMapping.id).where(
+                TerritoryMapping.territory_id == territory.id,
+                TerritoryMapping.agent_profile_id == agent_user.agent_profile.id,
+            ))
+            if exists is None:
+                session.add(TerritoryMapping(
+                    territory_id=territory.id,
+                    agent_profile_id=agent_user.agent_profile.id,
+                    priority=1,
+                ))
 
         admin = await session.scalar(select(User).where(User.email == settings.seed_admin_email))
         for order, (name, aliases) in enumerate(VEHICLE_MODELS.items()):
