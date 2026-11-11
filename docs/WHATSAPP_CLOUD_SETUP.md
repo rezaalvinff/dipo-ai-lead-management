@@ -10,15 +10,15 @@ Fondasi webhook dan adapter Cloud API tersedia. Development tetap menggunakan WH
 - Verifikasi hub.verify_token dan signature X-Hub-Signature-256.
 - Parsing pesan masuk teks, referral iklan CTWA, dan status sent/delivered/read/failed.
 - Anti-duplikasi berdasarkan payload webhook dan wamid.
-- Balasan teks melalui WhatsApp Cloud adapter.
+- Balasan teks dan approved template message melalui WhatsApp Cloud adapter.
+- Pengiriman media image/video/document/audio menggunakan Meta media ID yang sudah diunggah.
 - Kill switch: pengiriman ditolak kecuali APP_ENV=production dan WHATSAPP_CLOUD_SEND_ENABLED=true.
 - Status readiness tanpa mengekspos secret: GET /api/v1/integrations/whatsapp/status.
 - Aturan 24 jam: free-form text ditolak setelah 24 jam dari pesan customer terakhir; integrasi template message harus digunakan untuk menghubungi kembali.
 
 ## Belum tersedia / belum bisa diuji
 
-- Template message API (termasuk parameter dan komponen template).
-- Upload/kirim media.
+- Upload media file ke Meta dari dashboard (saat ini endpoint mengirim media ID yang sudah tersedia).
 - End-to-end test dengan nomor test Meta atau nomor bisnis DIPO.
 - Verifikasi webhook melalui URL publik HTTPS.
 - Validasi template yang sudah disetujui dan pengujian jendela layanan pada akun Meta.
