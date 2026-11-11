@@ -33,8 +33,9 @@ async def whatsapp_status(
         "webhook_verification_supported": True,
         "incoming_text_supported": True,
         "outgoing_text_supported": True,
-        "templates_supported": False,
-        "media_supported": False,
+        "templates_supported": True,
+        "media_supported": True,
+        "media_upload_supported": False,
         "production_activation_ready": bool(
             settings.is_production
             and settings.whatsapp_provider == "whatsapp_cloud"
@@ -44,6 +45,6 @@ async def whatsapp_status(
         ),
         "note": (
             "Tidak ada token atau secret yang ditampilkan. Pengiriman sungguhan "
-            "tetap nonaktif sampai aktivasi eksplisit."
+            "tetap nonaktif sampai aktivasi eksplisit. Media dikirim memakai media_id yang sudah diunggah."
         ),
     }
