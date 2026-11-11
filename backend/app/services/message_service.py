@@ -193,7 +193,7 @@ class MessageService:
                 "Template message hanya tersedia pada WhatsApp Cloud API.",
                 code="TEMPLATE_PROVIDER_UNAVAILABLE",
             )
-        send_template = getattr(self.messaging, "send_template")
+        send_template = self.messaging.send_template  # type: ignore[attr-defined]
 
         async def send(to_phone: str) -> SendResult:
             return await send_template(to_phone, template_name, language_code, components)
@@ -233,7 +233,7 @@ class MessageService:
                     "Jendela layanan 24 jam telah berakhir. Gunakan template WhatsApp.",
                     code="WHATSAPP_TEMPLATE_REQUIRED",
                 )
-        send_media = getattr(self.messaging, "send_media")
+        send_media = self.messaging.send_media  # type: ignore[attr-defined]
 
         async def send(to_phone: str) -> SendResult:
             return await send_media(to_phone, media_type, media_id, caption, filename)
