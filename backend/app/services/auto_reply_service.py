@@ -261,7 +261,9 @@ class AutoReplyService:
         message = await self._send(conversation, reply_text) if reply_text else None
         if decision.handover_reason:
             if decision.handover_reason == HandoverReason.QUALIFICATION_COMPLETE:
-                routing = await RoutingService(self.session).route_qualified_lead(lead, conversation)
+                routing = await RoutingService(self.session).route_qualified_lead(
+                    lead, conversation
+                )
                 target = (
                     ConversationHandler.SALES
                     if routing.get("assigned")
