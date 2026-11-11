@@ -10,7 +10,15 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, NotFoundError
-from app.models import AgentProfile, Assignment, Conversation, Lead, Territory, TerritoryMapping, User
+from app.models import (
+    AgentProfile,
+    Assignment,
+    Conversation,
+    Lead,
+    Territory,
+    TerritoryMapping,
+    User,
+)
 from app.models.enums import ConversationHandler, LeadStatus, LeadTemperature
 from app.services.audit_service import record_audit
 
