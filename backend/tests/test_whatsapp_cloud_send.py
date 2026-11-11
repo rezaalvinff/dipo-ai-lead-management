@@ -5,11 +5,12 @@ import pytest
 
 from app.adapters.whatsapp.cloud import WhatsAppCloudAdapter
 from app.core.config import AppEnv, WhatsAppProviderName
-from tests.conftest import STRONG_SECRET, make_settings
+from app.core.config import Settings
 
 
 def _production_settings():
-    return make_settings(
+    return Settings(
+        _env_file=None,
         app_env=AppEnv.PRODUCTION,
         simulator_enabled=False,
         whatsapp_provider=WhatsAppProviderName.WHATSAPP_CLOUD,
@@ -18,7 +19,7 @@ def _production_settings():
         whatsapp_phone_number_id="123456789",
         whatsapp_app_secret="dummy-meta-app-secret",
         whatsapp_webhook_verify_token="dummy-verify-token",
-        jwt_secret=STRONG_SECRET,
+        jwt_secret="x9Kq2LmZ7vRt4WbN8cYp3HsJ6dFg1QaE",
     )
 
 
