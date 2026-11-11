@@ -44,8 +44,14 @@ async def list_admin_queue(
             "lead_status": lead.status if lead else None,
             "source": lead.source if lead else None,
             "is_simulated": contact.is_simulated,
-            "handover_reason": state.handover_reason if state else "manual_queue",
-            "last_message_at": conversation.last_message_at.isoformat() if conversation.last_message_at else None,
+            "handover_reason": (
+                state.handover_reason if state else "manual_queue"
+            ),
+            "last_message_at": (
+                conversation.last_message_at.isoformat()
+                if conversation.last_message_at
+                else None
+            ),
             "unread_count": conversation.unread_count,
         }
         for conversation, contact, lead, state in rows
@@ -67,8 +73,15 @@ async def claim_admin_queue_item(
         or conversation.status != ConversationStatus.OPEN
         or conversation.handler != ConversationHandler.ADMIN_QUEUE
     ):
-        raise NotFoundError("Item Admin Queue tidak ditemukan atau sudah ditangani", code="QUEUE_ITEM_NOT_FOUND")
+        raise NotFoundError(
+            "Item Admin Queue tidak ditemukan atau sudah ditangani",
+            code="QUEUE_ITEM_NOT_FOUND",
+        )
     result = await set_handler(session, conversation, ConversationHandler.ADMIN, user)
     result.assigned_user_id = user.id
     await session.commit()
-    return {"conversation_id": str(result.id), "handler": result.handler, "assigned_user_id": str(user.id)}
+    return {
+        "conversation_id": str(result.id),
+        "handler": result.handler,
+        "assigned_user_id": str(user.id),
+    }
