@@ -14,7 +14,9 @@ from app.schemas.messaging import (
     HandlerChangeRequest,
     MessageOut,
     QualificationStateOut,
+    SendMediaRequest,
     SendMessageRequest,
+    SendTemplateRequest,
 )
 from app.services.audit_service import record_audit
 from app.services.conversation_control import qualification_view, set_handler, take_over
@@ -97,6 +99,72 @@ async def send_manual_message(
         entity_id=message.id,
         actor_type="user",
         actor_user_id=user.id,
+    )
+    await session.commit()
+    return message
+
+
+
+@router.post("/{conversation_id}/templates", response_model=MessageOut, status_code=201)
+async def send_template_message(
+    conversation_id: uuid.UUID,
+    body: SendTemplateRequest,
+    user: User = Depends(get_current_user),
+    ctx: AppContext = Depends(get_ctx),
+    session: AsyncSession = Depends(get_session),
+):
+    conversation = await _get_visible(session, user, conversation_id)
+    await take_over(session, conversation, user)
+    sender = SenderType.SALES if user.role_name == RoleName.SALES else SenderType.ADMIN
+    message = await MessageService(session, ctx.messaging).send_template(
+        conversation,
+        body.template_name,
+        body.language_code,
+        body.components,
+        sender_type=sender,
+        sender_user_id=user.id,
+    )
+    record_audit(
+        session,
+        action="message.template_sent",
+        entity_type="message",
+        entity_id=message.id,
+        actor_type="user",
+        actor_user_id=user.id,
+        data={"template_name": body.template_name},
+    )
+    await session.commit()
+    return message
+
+
+@router.post("/{conversation_id}/media", response_model=MessageOut, status_code=201)
+async def send_media_message(
+    conversation_id: uuid.UUID,
+    body: SendMediaRequest,
+    user: User = Depends(get_current_user),
+    ctx: AppContext = Depends(get_ctx),
+    session: AsyncSession = Depends(get_session),
+):
+    conversation = await _get_visible(session, user, conversation_id)
+    await take_over(session, conversation, user)
+    sender = SenderType.SALES if user.role_name == RoleName.SALES else SenderType.ADMIN
+    message = await MessageService(session, ctx.messaging).send_media(
+        conversation,
+        body.media_type,
+        body.media_id,
+        body.caption,
+        body.filename,
+        sender_type=sender,
+        sender_user_id=user.id,
+    )
+    record_audit(
+        session,
+        action="message.media_sent",
+        entity_type="message",
+        entity_id=message.id,
+        actor_type="user",
+        actor_user_id=user.id,
+        data={"media_type": body.media_type, "media_id": body.media_id},
     )
     await session.commit()
     return message
