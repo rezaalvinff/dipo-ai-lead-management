@@ -10,10 +10,11 @@ type InboxItem = {
   temperature: string; source: string | null; is_simulated: boolean; provider: string;
   handler: string; status: string; unread_count: number; last_message_at: string | null;
 };
-type Message = { id: string; direction: string; sender_type: string; content: string; status: string; created_at_wib: string };
+type Message = { id: string; direction: string; sender_type: string; content: string; status: string; created_at: string; created_at_wib: string };
 type Agent = { id: string; display_name: string; is_available: boolean; active_leads: number; max_active_leads: number | null };
 type Lead = { id: string; full_name: string | null; domicile: string | null; vehicle_interest: string | null; temperature: string; status: string; source: string; assigned_agent_id: string | null; is_simulated: boolean };
 type Contact = { id: string; display_name: string | null; phone_number: string };
+type SimChat = { conversations: { messages: Message[] }[] };
 type QueueItem = { conversation_id: string; customer_name: string; phone_number: string; domicile: string | null; vehicle_interest: string | null; temperature: string; handover_reason: string; unread_count: number };
 type Summary = { cold_leads: number; warm_leads: number; open_conversations: number; admin_queue: number; assigned_sales_conversations: number };
 
@@ -43,6 +44,7 @@ export default function Home() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [simMessages, setSimMessages] = useState<Message[]>([]);
   const [selectedContact, setSelectedContact] = useState("");
   const [summary, setSummary] = useState<Summary | null>(null);
   const [notice, setNotice] = useState("");
@@ -120,13 +122,18 @@ export default function Home() {
   async function loadSimulator() {
     try {
       const data = await api<Contact[]>("/simulator/contacts"); setContacts(data);
-      if (!selectedContact && data[0]) setSelectedContact(data[0].id);
+      if (!selectedContact && data[0]) { setSelectedContact(data[0].id); await loadSimChat(data[0].id); }
     } catch (e) { setNotice(e instanceof Error ? e.message : "Simulator tidak tersedia"); }
+  }
+  async function loadSimChat(contactId: string) {
+    if (!contactId) { setSimMessages([]); return; }
+    try { const chat = await api<SimChat>(`/simulator/contacts/${contactId}/chat`); setSimMessages(chat.conversations.flatMap(x => x.messages)); }
+    catch (e) { setNotice(e instanceof Error ? e.message : "Gagal memuat chat simulasi"); }
   }
   async function createDummy() {
     try {
       const contact = await api<Contact>("/simulator/contacts", { method: "POST", body: JSON.stringify({ display_name: "Customer Dummy" }) });
-      setContacts(old => [...old, contact]); setSelectedContact(contact.id);
+      setContacts(old => [...old, contact]); setSelectedContact(contact.id); setSimMessages([]);
     } catch (e) { setNotice(e instanceof Error ? e.message : "Gagal membuat customer dummy"); }
   }
   async function sendAsCustomer(e: FormEvent) {
@@ -134,7 +141,7 @@ export default function Home() {
     setBusy(true);
     try {
       await api(`/simulator/contacts/${selectedContact}/messages`, { method: "POST", body: JSON.stringify({ text: messageText.trim() }) });
-      setMessageText(""); await loadSimulator(); await loadAll();
+      setMessageText(""); await loadSimChat(selectedContact); await loadAll();
     } catch (e) { setNotice(e instanceof Error ? e.message : "Pesan simulasi gagal"); }
     finally { setBusy(false); }
   }
@@ -179,7 +186,7 @@ export default function Home() {
         <div className="conversation-list"><div className="list-head"><strong>Percakapan</strong><span>{visibleItems.length}</span></div>{visibleItems.map(item => <button key={item.id} className={selected?.id === item.id ? "conversation active" : "conversation"} onClick={() => setSelected(item)}><div className="avatar">{(item.customer_name || "C").slice(0,1)}</div><div className="conv-copy"><div className="conv-title"><b>{item.customer_name}</b><time>{fmt(item.last_message_at)}</time></div><p>{item.vehicle_interest || item.domicile || item.phone_number}</p><div className="conv-tags"><span className={item.temperature === "warm" ? "tag warm" : "tag cold"}>{item.temperature}</span><span className="tag neutral">{item.handler}</span>{item.is_simulated && <span className="tag neutral">dummy</span>}</div></div></button>)}</div>
         <div className="chat-panel">{selected ? <><div className="chat-head"><div className="avatar">{selected.customer_name.slice(0,1)}</div><div><b>{selected.customer_name}</b><span>{selected.phone_number} · {selected.domicile || "Domisili belum diisi"} · {selected.vehicle_interest || "Unit belum diisi"}</span></div><span className={selected.temperature === "warm" ? "tag warm" : "tag cold"}>{selected.temperature}</span></div><div className="messages">{messages.map(m => <div key={m.id} className={`bubble-row ${m.direction === "outbound" ? "outgoing" : ""}`}><div className={`bubble ${m.direction === "outbound" ? "out" : "in"}`}><small>{m.sender_type}</small><p>{m.content}</p><time>{m.created_at_wib || fmt(m.created_at)}</time></div></div>)}</div><form className="composer" onSubmit={sendMessage}><input value={messageText} onChange={e => setMessageText(e.target.value)} placeholder="Tulis balasan kepada customer…" /><button className="primary" disabled={busy || !messageText.trim()}>Kirim</button></form></> : <div className="empty">Pilih percakapan untuk melihat riwayat chat.</div>}</div>
       </div>}
-      {section === "simulator" && isStaff && <div className="content-area"><div className="panel simulator-panel"><div className="panel-heading"><div><h3>Simulated WhatsApp</h3><p>Uji alur customer → AI → sales tanpa nomor WhatsApp asli.</p></div><button className="primary" onClick={createDummy}>＋ Customer dummy</button></div><div className="sim-toolbar"><select value={selectedContact} onChange={e => setSelectedContact(e.target.value)}><option value="">Pilih customer dummy</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.display_name} · {c.phone_number}</option>)}</select><button className="secondary" onClick={loadSimulator}>Refresh</button></div><div className="sim-note">Nomor customer dummy menggunakan prefix +62800. Tidak ada pesan yang dikirim ke WhatsApp sungguhan.</div><form className="composer" onSubmit={sendAsCustomer}><input value={messageText} onChange={e => setMessageText(e.target.value)} placeholder="Ketik pesan sebagai customer…" /><button className="primary" disabled={busy || !selectedContact || !messageText.trim()}>Kirim sebagai customer</button></form></div></div>}
+      {section === "simulator" && isStaff && <div className="content-area"><div className="panel simulator-panel"><div className="panel-heading"><div><h3>Simulated WhatsApp</h3><p>Uji alur customer → AI → sales tanpa nomor WhatsApp asli.</p></div><button className="primary" onClick={createDummy}>＋ Customer dummy</button></div><div className="sim-toolbar"><select value={selectedContact} onChange={e => { setSelectedContact(e.target.value); loadSimChat(e.target.value); }}><option value="">Pilih customer dummy</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.display_name} · {c.phone_number}</option>)}</select><button className="secondary" onClick={loadSimulator}>Refresh</button></div><div className="sim-note">Nomor customer dummy menggunakan prefix +62800. Tidak ada pesan yang dikirim ke WhatsApp sungguhan.</div><div className="sim-messages">{simMessages.map(m=><div key={m.id} className={`bubble-row ${m.direction === "outbound" ? "outgoing" : ""}`}><div className={`bubble ${m.direction === "outbound" ? "out" : "in"}`}><small>{m.sender_type}</small><p>{m.content}</p><time>{m.created_at_wib}</time></div></div>)}</div><form className="composer" onSubmit={sendAsCustomer}><input value={messageText} onChange={e => setMessageText(e.target.value)} placeholder="Ketik pesan sebagai customer…" /><button className="primary" disabled={busy || !selectedContact || !messageText.trim()}>Kirim sebagai customer</button></form></div></div>}
       {section === "settings" && isStaff && <div className="content-area"><div className="panel"><div className="panel-heading"><div><h3>Profil sales</h3><p>Daftar agent dan kapasitas lead saat ini.</p></div></div><div className="table-wrap"><table><thead><tr><th>Nama</th><th>Ketersediaan</th><th>Lead aktif</th><th>Kapasitas</th></tr></thead><tbody>{agents.map(a=><tr key={a.id}><td><b>{a.display_name}</b></td><td><span className={a.is_available ? "tag warm" : "tag cold"}>{a.is_available ? "Tersedia" : "Tidak tersedia"}</span></td><td>{a.active_leads}</td><td>{a.max_active_leads ?? "Tidak dibatasi"}</td></tr>)}</tbody></table></div></div><div className="panel"><div className="panel-heading"><div><h3>Wilayah & mapping</h3><p>Master wilayah dikelola melalui API; area sekitar tidak otomatis terpetakan.</p></div></div><TerritoryPanel /></div></div>}
     </section>
   </main>;
