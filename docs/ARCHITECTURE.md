@@ -82,7 +82,7 @@ ditulis langsung di service agar struktur lebih sederhana.
 | `app/api/v1/` | endpoint HTTP |
 | `app/scripts/seed.py` | data dummy |
 
-Service yang **sudah ada** (Phase 1):
+Service yang **sudah ada** (Phase 1–7 fondasi):
 
 | Service | Tanggung jawab |
 |---------|----------------|
@@ -100,8 +100,7 @@ Service yang **sudah ada** (Phase 1):
 | `AuthService`, `UserService` | Login, pembuatan user (+ agent profile untuk sales) |
 | `record_audit` | Menulis `audit_logs` |
 
-Service yang **direncanakan**: `LeadTaggingService`, `RoutingService`, `AdminQueueService`,
-`ConversionEventService`. Detail AI Agent: `docs/AI_AGENT.md`.
+RoutingService, Admin Queue API, inbox projection, dashboard summary, dan WhatsApp readiness endpoint sudah ditambahkan. WebSocket/SSE, template/media API, dan ConversionEventService produksi masih direncanakan. Detail AI Agent: `docs/AI_AGENT.md`.
 
 ## 4. Adapter Pattern
 
@@ -227,7 +226,7 @@ stateDiagram-v2
 **State pengumpulan data** (`qualification_states.stage`): `collecting` → `handed_over`.
 Lihat `docs/AI_AGENT.md` untuk semua alasan handover.
 
-**Tag lead (`leads.temperature`):** `cold` → `warm` (aturan detail ditetapkan di Fase 5).
+**Tag lead (`leads.temperature`):** `cold` → `warm` hanya setelah assignment sales berhasil disimpan (lihat Phase 3).
 Contoh awal aturan:
 - **Cold:** baru tanya-tanya umum, data belum lengkap, atau tidak merespons.
 - **Warm:** nama + domisili + unit sudah lengkap **dan** ada sinyal minat
