@@ -56,7 +56,10 @@ class RoutingService:
         if lead.assigned_agent_id:
             profile = await self.session.get(AgentProfile, lead.assigned_agent_id)
             if profile:
-                return {"assigned": True, "agent_profile_id": str(profile.id), "reason": "already_assigned"}
+                conversation.handler = ConversationHandler.SALES
+                conversation.assigned_user_id = profile.user_id
+                lead.temperature = LeadTemperature.WARM
+                return {"assigned": True, "agent_profile_id": str(profile.id), "assigned_user_id": str(profile.user_id), "reason": "already_assigned"}
 
         territory = await self._match_territory(lead.domicile_raw)
         if territory is None:
