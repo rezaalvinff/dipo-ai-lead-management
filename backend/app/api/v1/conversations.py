@@ -104,7 +104,6 @@ async def send_manual_message(
     return message
 
 
-
 @router.post("/{conversation_id}/templates", response_model=MessageOut, status_code=201)
 async def send_template_message(
     conversation_id: uuid.UUID,
