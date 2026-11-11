@@ -5,13 +5,14 @@ Used by the simulator AND the WhatsApp Cloud webhook — never duplicated.
 
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.whatsapp.base import InboundMessage, MessagingProvider, StatusUpdate
+from app.core.errors import AppError
 from app.core.safety import RealDeliveryBlockedError
 from app.models import Contact, Conversation, Message
 from app.models.enums import (
@@ -19,6 +20,7 @@ from app.models.enums import (
     MessageDirection,
     MessageStatus,
     SenderType,
+    ProviderName,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,6 +74,13 @@ class MessageService:
         """Store an outgoing message, hand it to the active provider, record the result."""
         if self.messaging is None:
             raise RuntimeError("MessageService needs a MessagingProvider to send")
+        if getattr(self.messaging, "name", None) == ProviderName.WHATSAPP_CLOUD:
+            last_inbound = conversation.last_inbound_at
+            if last_inbound is None or datetime.now(UTC) - last_inbound > timedelta(hours=24):
+                raise AppError(
+                    "Jendela layanan 24 jam telah berakhir. Gunakan template WhatsApp yang disetujui Meta.",
+                    code="WHATSAPP_TEMPLATE_REQUIRED",
+                )
         contact = await self.session.get(Contact, conversation.contact_id)
         if contact is None:
             raise RuntimeError("Conversation has no contact")
