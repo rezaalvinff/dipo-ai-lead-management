@@ -12,7 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.whatsapp.base import InboundMessage, MessagingProvider, SendResult, StatusUpdate
+from app.adapters.whatsapp.base import (
+    InboundMessage,
+    MessagingProvider,
+    SendResult,
+    StatusUpdate,
+)
 from app.core.errors import AppError
 from app.core.safety import RealDeliveryBlockedError
 from app.models import Contact, Conversation, Message
