@@ -36,12 +36,14 @@ class RoutingService:
         territories = await self.session.scalars(
             select(Territory).where(Territory.is_active.is_(True)).order_by(Territory.name)
         )
-        matches = [
-            territory
-            for territory in territories
-            if normalized
-            in {normalize_area(territory.name), *(normalize_area(a) for a in (territory.aliases or []))}
-        ]
+        matches = []
+        for territory in territories:
+            names = {
+                normalize_area(territory.name),
+                *(normalize_area(alias) for alias in (territory.aliases or [])),
+            }
+            if normalized in names:
+                matches.append(territory)
         # An ambiguous alias is deliberately not guessed.
         return matches[0] if len(matches) == 1 else None
 
@@ -69,7 +71,12 @@ class RoutingService:
                 conversation.handler = ConversationHandler.SALES
                 conversation.assigned_user_id = profile.user_id
                 lead.temperature = LeadTemperature.WARM
-                return {"assigned": True, "agent_profile_id": str(profile.id), "assigned_user_id": str(profile.user_id), "reason": "already_assigned"}
+                return {
+                    "assigned": True,
+                    "agent_profile_id": str(profile.id),
+                    "assigned_user_id": str(profile.user_id),
+                    "reason": "already_assigned",
+                }
 
         territory = await self._match_territory(lead.domicile_raw)
         if territory is None:
@@ -136,7 +143,9 @@ class RoutingService:
             "reason": "territory_match",
         }
 
-    async def _send_to_admin_queue(self, lead: Lead, conversation: Conversation, reason: str) -> dict:
+    async def _send_to_admin_queue(
+        self, lead: Lead, conversation: Conversation, reason: str
+    ) -> dict:
         lead.temperature = LeadTemperature.COLD
         lead.status = LeadStatus.QUALIFIED
         lead.assigned_agent_id = None
@@ -183,20 +192,38 @@ class RoutingService:
         if lead is None:
             raise NotFoundError("Lead tidak ditemukan", code="LEAD_NOT_FOUND")
         if not all((lead.full_name, lead.domicile_raw, lead.vehicle_interest)):
-            raise AppError("Lead belum memiliki nama, domisili, dan unit lengkap", code="LEAD_NOT_QUALIFIED")
+            raise AppError(
+                "Lead belum memiliki nama, domisili, dan unit lengkap",
+                code="LEAD_NOT_QUALIFIED",
+            )
         agent = await self.session.scalar(
-            select(AgentProfile).join(User, User.id == AgentProfile.user_id).where(
-                AgentProfile.id == agent_profile_id, AgentProfile.is_available.is_(True), User.is_active.is_(True)
+            select(AgentProfile)
+            .join(User, User.id == AgentProfile.user_id)
+            .where(
+                AgentProfile.id == agent_profile_id,
+                AgentProfile.is_available.is_(True),
+                User.is_active.is_(True),
             )
         )
         if agent is None:
-            raise NotFoundError("Sales tidak ditemukan atau sedang tidak tersedia", code="AGENT_NOT_AVAILABLE")
+            raise NotFoundError(
+                "Sales tidak ditemukan atau sedang tidak tersedia",
+                code="AGENT_NOT_AVAILABLE",
+            )
         conversation = await self.session.scalar(
-            select(Conversation).where(Conversation.lead_id == lead.id, Conversation.status == "open")
-            .order_by(Conversation.created_at.desc()).limit(1)
+            select(Conversation)
+            .where(
+                Conversation.lead_id == lead.id,
+                Conversation.status == "open",
+            )
+            .order_by(Conversation.created_at.desc())
+            .limit(1)
         )
         if conversation is None:
-            raise NotFoundError("Percakapan aktif untuk lead ini tidak ditemukan", code="CONVERSATION_NOT_FOUND")
+            raise NotFoundError(
+                "Percakapan aktif untuk lead ini tidak ditemukan",
+                code="CONVERSATION_NOT_FOUND",
+            )
         await self._persist_assignment(
             lead, conversation, agent, reason="manual_admin_assignment",
             assigned_by_type="user", assigned_by_user_id=actor.id,
