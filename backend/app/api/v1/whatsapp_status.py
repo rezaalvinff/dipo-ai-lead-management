@@ -45,6 +45,7 @@ async def whatsapp_status(
         ),
         "note": (
             "Tidak ada token atau secret yang ditampilkan. Pengiriman sungguhan "
-            "tetap nonaktif sampai aktivasi eksplisit. Media dikirim memakai media_id yang sudah diunggah."
+            "tetap nonaktif sampai aktivasi eksplisit. Media dikirim memakai media_id "
+            "yang sudah diunggah."
         ),
     }
