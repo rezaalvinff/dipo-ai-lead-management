@@ -1,7 +1,15 @@
 import pytest
 from sqlalchemy import select
 
-from app.models import AgentProfile, Contact, Conversation, Lead, Territory, TerritoryMapping, User
+from app.models import (
+    AgentProfile,
+    Contact,
+    Conversation,
+    Lead,
+    Territory,
+    TerritoryMapping,
+    User,
+)
 from app.models.enums import ConversationHandler, LeadStatus, LeadTemperature
 from app.services.routing_service import RoutingService
 
