@@ -76,9 +76,13 @@ class MessageService:
             raise RuntimeError("MessageService needs a MessagingProvider to send")
         if getattr(self.messaging, "name", None) == ProviderName.WHATSAPP_CLOUD:
             last_inbound = conversation.last_inbound_at
-            if last_inbound is None or datetime.now(UTC) - last_inbound > timedelta(hours=24):
+            if (
+                last_inbound is None
+                or datetime.now(UTC) - last_inbound > timedelta(hours=24)
+            ):
                 raise AppError(
-                    "Jendela layanan 24 jam telah berakhir. Gunakan template WhatsApp yang disetujui Meta.",
+                    "Jendela layanan 24 jam telah berakhir. Gunakan template WhatsApp "
+                    "yang disetujui Meta.",
                     code="WHATSAPP_TEMPLATE_REQUIRED",
                 )
         contact = await self.session.get(Contact, conversation.contact_id)
