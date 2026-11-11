@@ -114,17 +114,8 @@ class WhatsAppCloudAdapter:
         base = f"{s.whatsapp_api_base_url}/{s.whatsapp_api_version}"
         return f"{base}/{s.whatsapp_phone_number_id}/messages"
 
-    async def send_text(self, to_phone: str, text: str) -> SendResult:
-        # Safety layer 2: refuse unless production AND explicitly enabled.
-        ensure_real_delivery_allowed(self._settings, "whatsapp_cloud.send_text")
-
-        body = {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": to_phone.lstrip("+"),
-            "type": "text",
-            "text": {"preview_url": False, "body": text},
-        }
+    async def _send_payload(self, to_phone: str, body: dict, operation: str) -> SendResult:
+        ensure_real_delivery_allowed(self._settings, operation)
         headers = {"Authorization": f"Bearer {self._settings.whatsapp_access_token}"}
         client = self._http or httpx.AsyncClient(timeout=15)
         try:
@@ -144,3 +135,61 @@ class WhatsAppCloudAdapter:
             )
         wamid = (data.get("messages") or [{}])[0].get("id", "")
         return SendResult(provider_message_id=wamid, status=MessageStatus.SENT, raw=data)
+
+    async def send_text(self, to_phone: str, text: str) -> SendResult:
+        body = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to_phone.lstrip("+"),
+            "type": "text",
+            "text": {"preview_url": False, "body": text},
+        }
+        return await self._send_payload(to_phone, body, "whatsapp_cloud.send_text")
+
+    async def send_template(
+        self,
+        to_phone: str,
+        template_name: str,
+        language_code: str = "id",
+        components: list[dict] | None = None,
+    ) -> SendResult:
+        body = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to_phone.lstrip("+"),
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {"code": language_code},
+                "components": components or [],
+            },
+        }
+        return await self._send_payload(to_phone, body, "whatsapp_cloud.send_template")
+
+    async def send_media(
+        self,
+        to_phone: str,
+        media_type: str,
+        media_id: str,
+        caption: str | None = None,
+        filename: str | None = None,
+    ) -> SendResult:
+        if media_type not in {"image", "video", "document", "audio"}:
+            return SendResult(
+                provider_message_id="",
+                status=MessageStatus.FAILED,
+                error="Unsupported WhatsApp media type",
+            )
+        media: dict = {"id": media_id}
+        if caption and media_type in {"image", "video", "document"}:
+            media["caption"] = caption
+        if filename and media_type == "document":
+            media["filename"] = filename
+        body = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to_phone.lstrip("+"),
+            "type": media_type,
+            media_type: media,
+        }
+        return await self._send_payload(to_phone, body, "whatsapp_cloud.send_media")
