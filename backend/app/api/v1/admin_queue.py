@@ -9,7 +9,6 @@ from app.api.deps import get_current_user, get_session, require_roles
 from app.core.errors import NotFoundError
 from app.models import Contact, Conversation, Lead, QualificationState, User
 from app.models.enums import ConversationHandler, ConversationStatus, RoleName
-from app.services.audit_service import record_audit
 from app.services.conversation_control import set_handler
 
 router = APIRouter(prefix="/admin-queue", tags=["admin queue"])
