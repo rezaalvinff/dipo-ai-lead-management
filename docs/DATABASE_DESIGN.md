@@ -296,3 +296,14 @@ lead, percakapan, pesan, assignment, dan conversion event miliknya. `audit_logs`
   `messages.content`, `messages.raw_payload`. Akses dibatasi sesuai role.
 - Nomor telepon di log aplikasi disamarkan (`+6280******123`).
 - Kebijakan retensi (berapa lama data disimpan) diputuskan sebelum go-live.
+
+
+## Implementasi Phase 3 — Routing
+
+Phase 3 tidak menambah tabel baru. Sistem menggunakan tabel `territories`, `territory_mappings`, `agent_profiles`, `leads`, dan `assignments` yang sudah ada.
+
+- `leads.temperature` hanya menjadi `warm` saat assignment aktif ke profil sales berhasil dipersist.
+- `leads.assigned_agent_id` menunjuk agent saat ini; `leads.territory_id` menunjuk wilayah yang cocok secara exact.
+- `assignments` menyimpan riwayat; ketika dipindahkan, assignment sebelumnya diberi `ended_at`, lalu baris baru dibuat.
+- Lead yang belum lengkap atau tidak bisa dipetakan/ditugaskan tetap `cold`; percakapan diarahkan ke `admin_queue`.
+- Wilayah tidak otomatis mencakup kota tetangga. Tambahkan alias/mapping hanya setelah cakupan wilayah dikonfirmasi admin.
