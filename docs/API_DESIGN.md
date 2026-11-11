@@ -180,4 +180,6 @@ Balasan manusia tetap menggunakan `POST /conversations/{id}/messages`. Balasan m
 | GET | `/webhooks/whatsapp` | Meta webhook | Verification handshake |
 | POST | `/webhooks/whatsapp` | Meta webhook | Pesan masuk, referral, dan status pesan dengan signature validation |
 
-Pengiriman free-form text melalui Cloud API diblokir setelah 24 jam sejak pesan customer terakhir. Template message dan media belum didukung. Pengiriman tetap terkunci kecuali production dan `WHATSAPP_CLOUD_SEND_ENABLED=true`; jangan aktifkan sebelum nomor Meta tersedia dan checklist `docs/WHATSAPP_CLOUD_SETUP.md` selesai.
+Pengiriman free-form text dan media melalui Cloud API diblokir setelah 24 jam sejak pesan customer terakhir. Template message dapat dikirim di luar jendela jika template telah disetujui Meta. Media endpoint memakai media ID yang telah diunggah; upload media dari dashboard belum tersedia. Pengiriman tetap terkunci kecuali production dan `WHATSAPP_CLOUD_SEND_ENABLED=true`; jangan aktifkan sebelum nomor Meta tersedia dan checklist `docs/WHATSAPP_CLOUD_SETUP.md` selesai.
+| POST | `/conversations/{id}/templates` | login | Kirim approved template message dengan language dan components; dapat dipakai di luar 24 jam |
+| POST | `/conversations/{id}/media` | login | Kirim media menggunakan Meta media ID; free-form media dibatasi jendela 24 jam |
