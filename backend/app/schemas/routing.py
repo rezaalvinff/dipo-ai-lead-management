@@ -45,3 +45,8 @@ class TerritoryMappingOut(BaseModel):
     priority: int
 
     model_config = {"from_attributes": True}
+
+
+class AgentUpdate(BaseModel):
+    is_available: bool | None = None
+    max_active_leads: int | None = Field(default=None, ge=0, le=10000)
