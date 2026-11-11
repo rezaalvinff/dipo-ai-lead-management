@@ -12,10 +12,10 @@ Legenda status: ✅ selesai · 🔄 menunggu persetujuan · ⏳ belum dimulai
 | 1  | Backend, Database, Simulated WhatsApp, Fondasi WhatsApp Cloud API | ✅ |
 | 2  | AI Agent & Knowledge Base (nama, domisili, unit + handover) | 🔄 |
 | 3  | Cold/Warm Tagging & Routing ke Sales | 🔄 review pemilik project |
-| 4  | Admin Queue, Handover & Balasan Sales | ⏳ |
-| 5  | Frontend: Kerangka, Login, Simulator Chat mirip WhatsApp | ⏳ |
-| 6  | Frontend: Dashboard Admin, Supervisor & Sales | ⏳ |
-| 7  | Aktivasi WhatsApp Cloud API (setelah nomor tersedia) | ⏳ |
+| 4  | Admin Queue, Handover & Balasan Sales | 🔄 review/pengujian |
+| 5  | Frontend: Kerangka, Login, Simulator Chat mirip WhatsApp | 🔄 review/pengujian |
+| 6  | Frontend: Dashboard Admin, Supervisor & Sales | 🔄 review/pengujian |
+| 7  | Aktivasi WhatsApp Cloud API (setelah nomor tersedia) | 🔄 fondasi siap; menunggu nomor Meta |
 | 8  | Conversion Event (Meta Conversions API) & Campaign Tracking | ⏳ |
 | 9  | Deployment VPS & Hardening Keamanan | ⏳ |
 | 10 | UAT & Go-Live | ⏳ |
@@ -60,21 +60,32 @@ Struktur folder, `CLAUDE.md`, `README.md`, `ROADMAP.md`, dokumen arsitektur, dat
 - Seed development menyediakan lima akun sales dummy: Medan, Jakarta, Pekanbaru, Surabaya, Padang. Area lain harus ditambahkan admin secara eksplisit.
 - Automated tests disiapkan untuk mapped territory, unmapped territory, dan lead incomplete.
 
-## Phase 4 — Admin Queue, Handover & Balasan Sales
-- `admin_queue_items`: routing gagal, customer minta manusia, AI ragu, komplain.
-- Admin assign manual. Handover: AI berhenti saat ditangani manusia.
+## Phase 4 — Admin Queue, Handover & Balasan Sales 🔄
+- Admin Queue diturunkan dari percakapan open dengan handler `admin_queue` (tidak menambah tabel queue duplikat).
+- Endpoint daftar antrean dan claim untuk admin/supervisor; lead tetap COLD sampai di-assign ke sales.
+- Admin dapat mengambil antrean dan membalas melalui endpoint pesan manual yang sama; AI berhenti setelah handler menjadi manusia.
+- Assignment ke sales menggunakan endpoint Phase 3 dan menyimpan riwayat assignment.
+- Customer yang meminta manusia, AI tidak tersedia, data parsial, dan routing gagal diarahkan ke Admin Queue oleh aturan handover backend.
 
-## Phase 5 — Frontend: Kerangka & Simulator
-- Next.js + TypeScript + Tailwind + shadcn/ui, login, layout.
-- Halaman simulator mirip WhatsApp + panel data lead, banner **DEVELOPMENT MODE**.
-- Update real-time (WebSocket/SSE).
+## Phase 5 — Frontend: Kerangka & Simulator 🔄
+- Next.js + TypeScript, login berbasis cookie, layout dashboard responsif.
+- Inbox dan simulator chat, buat customer dummy, kirim pesan sebagai customer, tampilkan riwayat.
+- Banner **DEVELOPMENT MODE**; tidak ada pengiriman ke WhatsApp asli.
+- Data inbox diperbarui berkala (polling 5 detik); WebSocket/SSE belum diimplementasikan.
 
-## Phase 6 — Frontend: Dashboard
-- Daftar & detail lead, Admin Queue, inbox sales, master data, statistik.
+## Phase 6 — Frontend: Dashboard 🔄
+- KPI dashboard, daftar leads dengan tag COLD/WARM dan assignment manual.
+- Admin Queue, inbox sales/admin, riwayat chat dan balasan dari nomor pusat melalui backend provider.
+- Tampilan profil sales, beban lead, daftar wilayah, alias, dan form tambah wilayah/mapping.
+- Endpoint ringkasan dashboard dan inbox projection.
+- Pengelolaan user tingkat lanjut dan edit/nonaktifkan profil sales masih perlu disempurnakan.
 
-## Phase 7 — Aktivasi WhatsApp Cloud API
-- Uji dengan nomor test Meta, template message, jendela 24 jam, media.
-- Aktivasi bertahap dengan `WHATSAPP_CLOUD_SEND_ENABLED`.
+## Phase 7 — Aktivasi WhatsApp Cloud API 🔄
+- Fondasi webhook verification/signature, parsing pesan teks, referral CTWA, status pesan, anti-duplikasi, dan outgoing text adapter tersedia.
+- Status readiness endpoint tidak menampilkan credential; free-form text diblokir setelah jendela 24 jam.
+- Pengiriman sungguhan tetap terkunci oleh `WHATSAPP_CLOUD_SEND_ENABLED=false`.
+- Belum selesai: template messages, media upload/send, end-to-end test nomor Meta, URL HTTPS publik, dan aktivasi nomor DIPO. Memerlukan nomor serta credential Meta yang belum tersedia.
+- Checklist: `docs/WHATSAPP_CLOUD_SETUP.md`.
 
 ## Phase 8 — Conversion Event & Campaign Tracking
 - `MetaConversionProvider`, pengisian `campaigns` dari referral iklan CTWA.
