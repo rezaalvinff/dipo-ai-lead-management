@@ -17,7 +17,7 @@ from app.models import (
 )
 from app.models.enums import RoleName
 from app.schemas.routing import (
-    ManualAssignRequest, TerritoryCreate, TerritoryMappingCreate, TerritoryMappingOut,
+    AgentUpdate, ManualAssignRequest, TerritoryCreate, TerritoryMappingCreate, TerritoryMappingOut,
     TerritoryMappingUpdate, TerritoryOut, TerritoryUpdate,
 )
 from app.services.audit_service import record_audit
@@ -211,3 +211,25 @@ async def list_agents(
             "active_leads": active_count or 0,
         })
     return result
+
+
+@router.patch("/agents/{agent_profile_id}")
+async def update_agent(
+    agent_profile_id: uuid.UUID,
+    body: AgentUpdate,
+    _: User = Depends(admin),
+    session: AsyncSession = Depends(get_session),
+):
+    profile = await session.get(AgentProfile, agent_profile_id)
+    if profile is None:
+        raise NotFoundError("Profil sales tidak ditemukan", code="AGENT_NOT_FOUND")
+    for key, value in body.model_dump(exclude_unset=True).items():
+        setattr(profile, key, value)
+    await session.commit()
+    await session.refresh(profile)
+    return {
+        "id": str(profile.id),
+        "display_name": profile.display_name,
+        "is_available": profile.is_available,
+        "max_active_leads": profile.max_active_leads,
+    }
