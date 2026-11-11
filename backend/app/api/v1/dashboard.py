@@ -4,7 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_session, require_roles
 from app.models import Conversation, Lead
-from app.models.enums import ConversationHandler, ConversationStatus, LeadTemperature, RoleName
+from app.models.enums import (
+    ConversationHandler,
+    ConversationStatus,
+    LeadTemperature,
+    RoleName,
+)
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 staff = require_roles(RoleName.ADMIN, RoleName.SUPERVISOR)
@@ -14,9 +19,17 @@ staff = require_roles(RoleName.ADMIN, RoleName.SUPERVISOR)
 async def dashboard_summary(
     _: object = Depends(staff), session: AsyncSession = Depends(get_session)
 ):
-    cold = await session.scalar(select(func.count(Lead.id)).where(Lead.temperature == LeadTemperature.COLD))
-    warm = await session.scalar(select(func.count(Lead.id)).where(Lead.temperature == LeadTemperature.WARM))
-    open_conversations = await session.scalar(select(func.count(Conversation.id)).where(Conversation.status == ConversationStatus.OPEN))
+    cold = await session.scalar(
+        select(func.count(Lead.id)).where(Lead.temperature == LeadTemperature.COLD)
+    )
+    warm = await session.scalar(
+        select(func.count(Lead.id)).where(Lead.temperature == LeadTemperature.WARM)
+    )
+    open_conversations = await session.scalar(
+        select(func.count(Conversation.id)).where(
+            Conversation.status == ConversationStatus.OPEN
+        )
+    )
     queue = await session.scalar(select(func.count(Conversation.id)).where(
         Conversation.status == ConversationStatus.OPEN,
         Conversation.handler == ConversationHandler.ADMIN_QUEUE,
