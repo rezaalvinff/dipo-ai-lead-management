@@ -130,14 +130,11 @@ Aturan `POST`:
 
 Respons: `{"status":"ok","messages_stored":1,"messages_duplicate":0,"statuses_applied":0}`
 
-## 6. Direncanakan (phase berikutnya)
+## 7. Direncanakan (phase berikutnya)
 
 | Method | Path | Fungsi |
 |--------|------|--------|
-| GET/PATCH | `/leads`, `/leads/{id}` | Daftar & ubah lead |
-| POST | `/leads/{id}/assign` | Assign manual ke sales |
 | GET/POST | `/admin-queue`, `/admin-queue/{id}/claim`, `/admin-queue/{id}/resolve` | Admin Queue |
-| GET/POST | `/territories`, `/territory-mappings` | Master wilayah & pemetaan sales |
 | GET/POST | `/campaigns` | Kelola campaign |
 | GET | `/stats/overview` | Statistik |
 | WS | `/ws` | Update real-time ke frontend |
