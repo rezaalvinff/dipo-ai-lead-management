@@ -81,7 +81,9 @@ async def lead_assignments(
     if await session.get(Lead, lead_id) is None:
         raise NotFoundError("Lead tidak ditemukan", code="LEAD_NOT_FOUND")
     rows = await session.scalars(
-        select(Assignment).where(Assignment.lead_id == lead_id).order_by(Assignment.created_at.desc())
+        select(Assignment)
+        .where(Assignment.lead_id == lead_id)
+        .order_by(Assignment.created_at.desc())
     )
     return [
         {
