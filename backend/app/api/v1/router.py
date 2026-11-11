@@ -1,6 +1,19 @@
 from fastapi import APIRouter
 
-from app.api.v1 import admin_queue, auth, conversations, dashboard, health, inbox, knowledge, routing, settings, simulator, webhooks, whatsapp_status
+from app.api.v1 import (
+    admin_queue,
+    auth,
+    conversations,
+    dashboard,
+    health,
+    inbox,
+    knowledge,
+    routing,
+    settings,
+    simulator,
+    webhooks,
+    whatsapp_status,
+)
 from app.core.config import Settings
 
 
