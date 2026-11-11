@@ -11,7 +11,7 @@ Legenda status: ✅ selesai · 🔄 menunggu persetujuan · ⏳ belum dimulai
 | 0  | Fondasi & Dokumentasi | ✅ |
 | 1  | Backend, Database, Simulated WhatsApp, Fondasi WhatsApp Cloud API | ✅ |
 | 2  | AI Agent & Knowledge Base (nama, domisili, unit + handover) | 🔄 |
-| 3  | Cold/Warm Tagging & Routing ke Sales | ⏳ |
+| 3  | Cold/Warm Tagging & Routing ke Sales | 🔄 review pemilik project |
 | 4  | Admin Queue, Handover & Balasan Sales | ⏳ |
 | 5  | Frontend: Kerangka, Login, Simulator Chat mirip WhatsApp | ⏳ |
 | 6  | Frontend: Dashboard Admin, Supervisor & Sales | ⏳ |
@@ -50,10 +50,15 @@ Struktur folder, `CLAUDE.md`, `README.md`, `ROADMAP.md`, dokumen arsitektur, dat
 - Guard backend: angka harga/promo yang tidak ada di knowledge base diblokir.
 - 24 skenario percakapan lewat Simulated WhatsApp. Detail: `docs/AI_AGENT.md`.
 
-## Phase 3 — Cold/Warm Tagging & Routing
-- Aturan Cold/Warm yang jelas & dapat diuji.
-- Pencocokan domisili ke `territories` (alias), routing ke sales via `territory_mappings`
-  (prioritas + round-robin + batas beban kerja), riwayat di `assignments`.
+## Phase 3 — Cold/Warm Tagging & Routing 🔄
+- WARM hanya setelah assignment aktif ke sales berhasil disimpan.
+- Lead incomplete, wilayah tidak dikenal/tidak dipetakan, sales tidak tersedia, atau kapasitas penuh tetap COLD dan masuk Admin Queue.
+- Exact-match domisili setelah normalisasi dan alias; kota sekitar tidak diasumsikan otomatis ikut terlayani.
+- Routing memakai territories + territory_mappings, prioritas, pemeriksaan ketersediaan/kapasitas, dan pemilihan agent yang paling lama belum menerima lead.
+- Assignment/reassignment dicatat di assignments; assignment lama diberi ended_at.
+- Admin dapat mengelola wilayah, alias, mapping, melihat lead dan riwayat assignment, serta melakukan assignment manual.
+- Seed development menyediakan lima akun sales dummy: Medan, Jakarta, Pekanbaru, Surabaya, Padang. Area lain harus ditambahkan admin secara eksplisit.
+- Automated tests disiapkan untuk mapped territory, unmapped territory, dan lead incomplete.
 
 ## Phase 4 — Admin Queue, Handover & Balasan Sales
 - `admin_queue_items`: routing gagal, customer minta manusia, AI ragu, komplain.
