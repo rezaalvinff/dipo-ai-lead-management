@@ -26,6 +26,9 @@ class Lead(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("territories.id", ondelete="SET NULL")
     )
     vehicle_interest: Mapped[str | None] = mapped_column(String(150))
+    vehicle_model_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("vehicle_models.id", ondelete="SET NULL")
+    )
 
     temperature: Mapped[str] = mapped_column(String(10), default=LeadTemperature.COLD)
     status: Mapped[str] = mapped_column(String(20), default=LeadStatus.NEW, index=True)

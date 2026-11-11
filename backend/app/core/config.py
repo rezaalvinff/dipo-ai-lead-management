@@ -27,6 +27,15 @@ class ConversionProviderName(StrEnum):
     META_CAPI = "meta_capi"
 
 
+class AIProviderName(StrEnum):
+    MOCK = "mock"  # deterministic, offline, free — development & tests
+    ANTHROPIC = "anthropic"  # Claude via Anthropic API (paid, separate from Claude Pro)
+    OPENAI = "openai"  # OpenAI API (paid)
+
+
+DEFAULT_ANTHROPIC_MODEL = "claude-opus-5-5"
+
+
 class JobQueueMode(StrEnum):
     ARQ = "arq"  # real background worker via Redis
     INLINE = "inline"  # run jobs immediately in-process (tests / quick local runs)
@@ -51,9 +60,18 @@ class Settings(BaseSettings):
 
     # --- Providers (adapter selection) ---
     whatsapp_provider: WhatsAppProviderName = WhatsAppProviderName.SIMULATED
-    ai_provider: str = "mock"
+    ai_provider: AIProviderName = AIProviderName.MOCK
     conversion_provider: ConversionProviderName = ConversionProviderName.NOOP
     job_queue: JobQueueMode = JobQueueMode.ARQ
+
+    # --- AI runtime (API billing is separate from any Claude Pro / ChatGPT subscription) ---
+    ai_model: str = ""  # empty = provider default (anthropic: claude-opus-5-5)
+    ai_effort: str = "medium"  # anthropic only: low | medium | high | xhigh | max
+    ai_max_tokens: int = 4000
+    ai_timeout_seconds: float = 45.0
+    ai_history_limit: int = 30
+    anthropic_api_key: str = ""
+    openai_api_key: str = ""
 
     # --- Infrastructure ---
     database_url: str = "postgresql+psycopg://dipo:changeme@localhost:5432/dipo_leads"
@@ -82,6 +100,14 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == AppEnv.PRODUCTION
+
+    @property
+    def resolved_ai_model(self) -> str:
+        if self.ai_model:
+            return self.ai_model
+        if self.ai_provider == AIProviderName.ANTHROPIC:
+            return DEFAULT_ANTHROPIC_MODEL
+        return self.ai_provider.value
 
     @model_validator(mode="after")
     def enforce_safety_rules(self) -> "Settings":
@@ -129,6 +155,18 @@ class Settings(BaseSettings):
                         + ", ".join(m.upper() for m in missing)
                         + "."
                     )
+
+        if self.ai_provider == AIProviderName.ANTHROPIC and not self.anthropic_api_key:
+            errors.append(
+                "AI_PROVIDER=anthropic requires ANTHROPIC_API_KEY (an API key, not Claude Pro)."
+            )
+        if self.ai_provider == AIProviderName.OPENAI:
+            if not self.openai_api_key:
+                errors.append("AI_PROVIDER=openai requires OPENAI_API_KEY.")
+            if not self.ai_model:
+                errors.append("AI_PROVIDER=openai requires AI_MODEL (choose the model explicitly).")
+        if self.ai_effort not in {"low", "medium", "high", "xhigh", "max"}:
+            errors.append("AI_EFFORT must be one of low, medium, high, xhigh, max.")
 
         if errors:
             raise ConfigurationError("Unsafe configuration: " + " ".join(errors))

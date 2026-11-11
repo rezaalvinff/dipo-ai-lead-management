@@ -9,8 +9,8 @@ Legenda status: ✅ selesai · 🔄 menunggu persetujuan · ⏳ belum dimulai
 | Phase | Nama | Status |
 |-------|------|--------|
 | 0  | Fondasi & Dokumentasi | ✅ |
-| 1  | Backend, Database, Simulated WhatsApp, Fondasi WhatsApp Cloud API | 🔄 |
-| 2  | AI Provider & Pengumpulan Data Lead (nama, domisili, unit) | ⏳ |
+| 1  | Backend, Database, Simulated WhatsApp, Fondasi WhatsApp Cloud API | ✅ |
+| 2  | AI Agent & Knowledge Base (nama, domisili, unit + handover) | 🔄 |
 | 3  | Cold/Warm Tagging & Routing ke Sales | ⏳ |
 | 4  | Admin Queue, Handover & Balasan Sales | ⏳ |
 | 5  | Frontend: Kerangka, Login, Simulator Chat mirip WhatsApp | ⏳ |
@@ -25,7 +25,7 @@ Legenda status: ✅ selesai · 🔄 menunggu persetujuan · ⏳ belum dimulai
 ## Phase 0 — Fondasi & Dokumentasi ✅
 Struktur folder, `CLAUDE.md`, `README.md`, `ROADMAP.md`, dokumen arsitektur, database, API, panduan.
 
-## Phase 1 — Backend, Database, Simulated WhatsApp 🔄
+## Phase 1 — Backend, Database, Simulated WhatsApp ✅
 - FastAPI, konfigurasi `.env`, logging, format error seragam, health check.
 - Autentikasi JWT (header/cookie) + RBAC (admin, supervisor, sales).
 - 15 tabel + migrasi Alembic + seed data dummy.
@@ -37,11 +37,18 @@ Struktur folder, `CLAUDE.md`, `README.md`, `ROADMAP.md`, dokumen arsitektur, dat
 - Pengaman 3 lapis agar development tidak bisa mengirim pesan sungguhan.
 - Docker Compose (postgres, redis, migrate, backend, worker).
 
-## Phase 2 — AI Provider & Pengumpulan Data Lead
-- Provider LLM sungguhan (dipilih pemilik project), API key lewat `.env`.
-- `LeadQualificationService`: AI menanyakan & mengekstrak nama, domisili, unit.
-- Memakai knowledge base. Log panggilan AI (`ai_interactions`).
-- Mock AI diperluas menjadi skenario kualifikasi yang deterministik untuk test.
+## Phase 2 — AI Agent & Knowledge Base 🔄
+- Provider layer modular: `mock` (gratis), `anthropic` (Claude API), `openai` (OpenAI API).
+  API key terpisah dari langganan Claude Pro.
+- AI mengumpulkan nama, domisili (kota/kabupaten), unit. Satu pertanyaan per balasan,
+  paham informal/typo, menerima koreksi, tidak memaksa (maks. 2x per data).
+- Conversation state (`qualification_states`) divalidasi backend. AI tidak menentukan status lead.
+- Handover otomatis + closing message yang bisa diedit admin (`app_settings`).
+- AI berhenti saat diambil alih manusia (termasuk saat AI sedang berpikir).
+- Knowledge base: model, varian, spesifikasi, harga, promo, DP, angsuran, FAQ, dealer,
+  dengan alur persetujuan (`draft` → `approved`) dan masa berlaku.
+- Guard backend: angka harga/promo yang tidak ada di knowledge base diblokir.
+- 24 skenario percakapan lewat Simulated WhatsApp. Detail: `docs/AI_AGENT.md`.
 
 ## Phase 3 — Cold/Warm Tagging & Routing
 - Aturan Cold/Warm yang jelas & dapat diuji.

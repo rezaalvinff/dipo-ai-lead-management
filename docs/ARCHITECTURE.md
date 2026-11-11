@@ -77,7 +77,7 @@ ditulis langsung di service agar struktur lebih sederhana.
 | `app/models/` | 15 tabel (lihat `DATABASE_DESIGN.md`) |
 | `app/schemas/` | bentuk data request/response (Pydantic) |
 | `app/services/` | business logic |
-| `app/adapters/` | WhatsApp (simulated, cloud), AI (mock) |
+| `app/adapters/` | WhatsApp (simulated, cloud), AI (mock, anthropic, openai, prompt, pencocokan typo) |
 | `app/workers/` | antrian job (ARQ / inline) & worker |
 | `app/api/v1/` | endpoint HTTP |
 | `app/scripts/seed.py` | data dummy |
@@ -90,14 +90,18 @@ Service yang **sudah ada** (Phase 1):
 | `MessageService` | Simpan pesan masuk (anti-duplikat), kirim pesan keluar lewat adapter aktif, terapkan status `sent/delivered/read/failed` |
 | `ConversationService` | Cari/buat percakapan terbuka, mulai percakapan baru |
 | `ContactService`, `LeadService` | Cari/buat kontak & lead aktif |
-| `AutoReplyService` | Ambil riwayat → AI → kirim balasan (dijalankan worker) |
+| `AutoReplyService` | Orkestrasi AI Agent di worker: kunci percakapan → konteks (state + knowledge approved + riwayat) → AI → keputusan backend → simpan → kirim → handover |
+| `QualificationService` | **Keputusan backend**: validasi nama/domisili/unit, pertanyaan berikutnya, batas tanya, handover, guard harga/promo |
+| `KnowledgeService` | CRUD knowledge base + alur approval + konteks untuk AI (hanya data approved & berlaku) |
+| `SettingsService` | Pengaturan admin (closing message, dll.) dengan default di kode |
+| `conversation_control` | Pengambilalihan oleh manusia & mengembalikan ke AI |
 | `WhatsAppWebhookService` | Proteksi duplikat webhook, parsing, teruskan ke service di atas |
 | `SimulatorService` | Lapisan tipis: membuat `InboundMessage`/`StatusUpdate` palsu lalu memanggil service yang sama |
 | `AuthService`, `UserService` | Login, pembuatan user (+ agent profile untuk sales) |
 | `record_audit` | Menulis `audit_logs` |
 
-Service yang **direncanakan**: `LeadQualificationService`, `LeadTaggingService`,
-`RoutingService`, `AdminQueueService`, `ConversionEventService`.
+Service yang **direncanakan**: `LeadTaggingService`, `RoutingService`, `AdminQueueService`,
+`ConversionEventService`. Detail AI Agent: `docs/AI_AGENT.md`.
 
 ## 4. Adapter Pattern
 
@@ -118,12 +122,14 @@ classDiagram
 
     class AIProvider {
         <<interface>>
-        +generate_reply(history) AIReply
+        +run_turn(AgentRequest) AIResult
     }
     class MockAIProvider
-    class LLMProvider
+    class AnthropicProvider
+    class OpenAIProvider
     AIProvider <|.. MockAIProvider
-    AIProvider <|.. LLMProvider
+    AIProvider <|.. AnthropicProvider
+    AIProvider <|.. OpenAIProvider
 
     class ConversionProvider {
         <<interface>>
@@ -218,6 +224,9 @@ stateDiagram-v2
     closed --> ai: customer chat lagi
 ```
 
+**State pengumpulan data** (`qualification_states.stage`): `collecting` → `handed_over`.
+Lihat `docs/AI_AGENT.md` untuk semua alasan handover.
+
 **Tag lead (`leads.temperature`):** `cold` → `warm` (aturan detail ditetapkan di Fase 5).
 Contoh awal aturan:
 - **Cold:** baru tanya-tanya umum, data belum lengkap, atau tidak merespons.
@@ -244,6 +253,6 @@ Secret di VPS disimpan di file `.env` di server (tidak pernah di Git).
 | Topik | Pilihan | Diputuskan di |
 |-------|---------|---------------|
 | Library worker | ✅ **ARQ** (ringan, async, memakai Redis) | Phase 1 |
-| AI provider LLM | Ditentukan pemilik project | Phase 2 |
+| AI provider LLM | ✅ Modular: Mock / Anthropic (default `claude-opus-5-5`) / OpenAI; pilihan akhir & model oleh pemilik project | Phase 2 |
 | Real-time | WebSocket atau SSE | Phase 5 |
 | Autentikasi | ✅ JWT (header Bearer atau cookie httpOnly) + RBAC | Phase 1 |

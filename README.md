@@ -3,9 +3,9 @@
 Sistem manajemen *leads* berbasis AI untuk **Mitsubishi DIPO**, terintegrasi dengan
 **WhatsApp Business** melalui **Meta WhatsApp Cloud API**.
 
-> **Status saat ini: Phase 1 — Backend, Database, Simulated WhatsApp** (menunggu persetujuan).
-> Backend API, database, worker, dan simulator WhatsApp sudah bisa dijalankan.
-> Frontend belum dibuat. Lihat [ROADMAP.md](ROADMAP.md).
+> **Status saat ini: Phase 2 — AI Agent & Knowledge Base** (menunggu persetujuan).
+> Backend, database, worker, simulator WhatsApp, AI Agent (Mock/Claude/OpenAI), dan
+> knowledge base sudah bisa dijalankan. Frontend belum dibuat. Lihat [ROADMAP.md](ROADMAP.md).
 
 ## Mulai Cepat
 
@@ -72,6 +72,7 @@ dipo-ai-lead-management/
 ├── .env.example            # contoh konfigurasi (placeholder saja)
 ├── docs/
 │   ├── ARCHITECTURE.md     # Arsitektur sistem
+│   ├── AI_AGENT.md         # Cara kerja AI Agent, knowledge base, skenario uji
 │   ├── DATABASE_DESIGN.md  # Rancangan tabel database
 │   ├── API_DESIGN.md       # Rancangan endpoint API
 │   └── DEVELOPMENT_GUIDE.md# Panduan pengembangan & testing
@@ -79,12 +80,12 @@ dipo-ai-lead-management/
 │   ├── app/
 │   │   ├── api/v1/         # Endpoint HTTP (router)
 │   │   ├── core/           # Konfigurasi & pengaman, DB/Redis, logging, error, JWT
-│   │   ├── models/         # 15 tabel database (SQLAlchemy)
+│   │   ├── models/         # 20 tabel database (SQLAlchemy)
 │   │   ├── schemas/        # Bentuk data request/response (Pydantic)
 │   │   ├── services/       # Business logic (inti sistem)
 │   │   ├── adapters/
 │   │   │   ├── whatsapp/   # Simulated & WhatsApp Cloud API
-│   │   │   ├── ai/         # Mock AI (AI sungguhan menyusul)
+│   │   │   ├── ai/         # Mock AI, Claude (Anthropic API), OpenAI + prompt
 │   │   │   └── conversion/ # (menyusul) No-op & Meta Conversions API
 │   │   ├── workers/        # Antrian job & background worker (ARQ)
 │   │   └── scripts/        # seed data dummy
@@ -104,6 +105,7 @@ Folder yang masih kosong berisi file `.gitkeep` agar tetap tercatat di Git.
 
 - [ROADMAP.md](ROADMAP.md) — urutan fase pengembangan
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — bagaimana komponen saling terhubung
+- [docs/AI_AGENT.md](docs/AI_AGENT.md) — AI Agent, knowledge base, handover, biaya AI
 - [docs/DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md) — tabel dan relasinya
 - [docs/API_DESIGN.md](docs/API_DESIGN.md) — daftar endpoint
 - [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) — cara menjalankan & menguji

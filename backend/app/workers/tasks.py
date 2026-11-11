@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 
 async def process_ai_reply(ctx: "AppContext", message_id: uuid.UUID) -> None:
     async with ctx.session_factory() as session:
-        service = AutoReplyService(session, ctx.ai, ctx.messaging)
+        service = AutoReplyService(
+            session, ctx.ai, ctx.messaging, history_limit=ctx.settings.ai_history_limit
+        )
         try:
             await service.reply_to(message_id)
         except Exception:

@@ -39,6 +39,7 @@ cp .env.example .env
 | `APP_ENV` | `development` | `production` |
 | `WHATSAPP_PROVIDER` | `simulated` (**wajib**) | `whatsapp_cloud` |
 | `CONVERSION_PROVIDER` | `noop` (**wajib**) | `meta_capi` |
+| `AI_PROVIDER` | `mock` (gratis) atau `anthropic`/`openai` | `anthropic` atau `openai` |
 | `SIMULATOR_ENABLED` | `true` | `false` (**wajib**) |
 | `WHATSAPP_CLOUD_SEND_ENABLED` | `false` (**wajib**) | `true` hanya saat siap go-live |
 | `JWT_SECRET` | bebas | string acak ≥ 32 karakter (**wajib**) |
@@ -62,7 +63,7 @@ Yang berjalan:
 | `backend` | API di http://localhost:8000 |
 | `worker` | Background worker yang membuat balasan AI |
 
-Isi data dummy (admin, supervisor, 2 sales, 3 wilayah, contoh knowledge base):
+Isi data dummy (admin, supervisor, 2 sales, 3 wilayah, katalog model Mitsubishi, placeholder knowledge base):
 
 ```bash
 docker compose exec backend python -m app.scripts.seed
@@ -102,17 +103,27 @@ docker compose down -v
 7. Percakapan baru: `POST /api/v1/simulator/contacts/{id}/conversations`
 8. Bersihkan: `DELETE /api/v1/simulator/contacts/{id}` atau `POST /api/v1/simulator/reset`
 
+9. Lihat data yang terkumpul: `GET /api/v1/conversations/{conversation_id}/state`
+10. Ambil alih sebagai admin: `POST /api/v1/conversations/{conversation_id}/messages`. Setelah itu AI berhenti membalas.
+
 | # | Skenario | Phase |
 |---|----------|-------|
 | 1 | Buat customer dummy, kirim pesan, terima balasan AI, lihat riwayat & status | ✅ Phase 1 |
-| 2 | AI mengumpulkan nama, domisili, unit | ⏳ berikutnya |
-| 3 | Cold/Warm tagging | ⏳ |
-| 4 | Routing ke sales | ⏳ |
-| 5 | Admin Queue | ⏳ |
-| 6 | Sales membalas & AI berhenti (handover) | sebagian (balasan manual sudah ada) |
+| 2 | AI mengumpulkan nama, domisili, unit + handover + closing message | ✅ Phase 2 |
+| 3 | Knowledge base (hanya data approved yang dipakai AI) | ✅ Phase 2 |
+| 4 | Sales/admin mengambil alih & AI berhenti | ✅ Phase 2 |
+| 5 | Cold/Warm tagging | ⏳ |
+| 6 | Routing ke sales | ⏳ |
+| 7 | Admin Queue (daftar & penanganan) | ⏳ |
 
-Catatan: balasan AI saat ini dibuat oleh **Mock AI**, yaitu jawaban tetap untuk pengujian.
-Percakapan cerdas dibangun di phase berikutnya.
+Daftar lengkap 24 skenario ada di `docs/AI_AGENT.md`.
+
+### Memakai Claude sungguhan (opsional, berbayar)
+
+1. Buat akun & API key di https://console.anthropic.com. Ini **terpisah** dari langganan Claude Pro.
+2. Di `.env`: `AI_PROVIDER=anthropic` dan `ANTHROPIC_API_KEY=<key Anda>`. Opsional: `AI_MODEL=...`.
+3. Restart: `docker compose up -d backend worker`.
+4. Pantau biaya di console Anthropic dan di tabel `ai_interactions` (jumlah token per panggilan).
 
 ## 6. Automated Test
 
@@ -137,7 +148,9 @@ docker compose run --rm --no-deps backend ruff check .
 ```
 
 Prinsip:
-- Test memakai `MockAIProvider`, `SimulatedWhatsAppAdapter`, dan HTTP palsu. Tidak butuh internet, tidak ada biaya, tidak ada pesan sungguhan.
+- Test memakai `MockAIProvider`, `SimulatedWhatsAppAdapter`, dan client SDK palsu. Tidak butuh internet, tidak ada biaya, tidak ada pesan sungguhan.
+- Skenario percakapan bisa dijalankan terhadap Claude sungguhan (**berbayar**):
+  `TEST_AI_PROVIDER=anthropic ANTHROPIC_API_KEY=... pytest -q tests/test_ai_scenarios.py`
 - Hasil test dilaporkan **apa adanya**.
 
 ## 7. Migrasi Database

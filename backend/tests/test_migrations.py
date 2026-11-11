@@ -20,6 +20,12 @@ EXPECTED_TABLES = {
     "conversion_events",
     "audit_logs",
     "webhook_events",
+    # Phase 2
+    "vehicle_models",
+    "vehicle_variants",
+    "qualification_states",
+    "app_settings",
+    "ai_interactions",
 }
 
 

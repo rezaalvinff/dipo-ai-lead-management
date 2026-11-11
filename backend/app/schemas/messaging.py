@@ -80,7 +80,24 @@ class SimStatusRequest(BaseModel):
 class SimChatOut(BaseModel):
     contact: ContactOut
     conversations: list[ConversationWithMessages]
+    state: "QualificationStateOut | None" = None
 
 
 class SimResetResponse(BaseModel):
     deleted_contacts: int
+
+
+class HandlerChangeRequest(BaseModel):
+    handler: str = Field(pattern="^(ai|admin_queue|sales|admin)$")
+
+
+class QualificationStateOut(BaseModel):
+    conversation_id: uuid.UUID
+    handler: str
+    lead_id: uuid.UUID | None
+    lead_status: str | None
+    stage: str
+    fields: dict
+    last_asked_field: str | None
+    handover_reason: str | None
+    history: list

@@ -1,20 +1,29 @@
 """Seed DUMMY development data:  python -m app.scripts.seed
 
-Creates an admin, a supervisor, two sales agents, sample territories and
-knowledge-base placeholders. Every name/email/phone here is fictional.
+Creates an admin, a supervisor, two sales agents, sample territories, the
+Mitsubishi model catalog (names only, approved) and DRAFT knowledge placeholders.
+Every name/email/phone here is fictional.
 Refuses to run in production.
 """
 
 import asyncio
 import logging
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.core.database import create_engine, create_session_factory
 from app.core.logging import configure_logging
-from app.models import AgentProfile, KnowledgeBaseArticle, Territory, TerritoryMapping, User
-from app.models.enums import RoleName
+from app.models import (
+    AgentProfile,
+    KnowledgeBaseArticle,
+    Territory,
+    TerritoryMapping,
+    User,
+    VehicleModel,
+)
+from app.models.enums import KnowledgeStatus, RoleName
 from app.services.auth_service import UserService
 
 logger = logging.getLogger("seed")
@@ -32,10 +41,26 @@ TERRITORIES = {
     "Depok": ["depok"],
 }
 
+# Article placeholders are DRAFT: the AI never sees them until an admin
+# replaces the text with official information and approves it.
 KNOWLEDGE = [
-    ("Contoh FAQ: Jam operasional", "faq", "Isi placeholder. Ganti dengan informasi resmi."),
-    ("Contoh unit kendaraan", "vehicle", "Isi placeholder. Ganti dengan data unit resmi."),
+    ("Jam operasional dealer", "dealer", "PLACEHOLDER - isi dengan jam operasional resmi."),
+    ("Alamat dealer", "dealer", "PLACEHOLDER - isi dengan alamat resmi."),
+    ("Apakah bisa test drive?", "faq", "PLACEHOLDER - isi dengan jawaban resmi."),
 ]
+
+# Model names + common informal spellings/typos. Names only: NO prices/promos,
+# those must come from official dealer data entered by an admin.
+VEHICLE_MODELS = {
+    "Xpander": ["xpander", "expander", "xpender", "x pander"],
+    "Xpander Cross": ["xpander cross", "expander cross", "cross"],
+    "Xforce": ["xforce", "x force", "x-force"],
+    "Pajero Sport": ["pajero sport", "pajero", "pajsport", "pajero sprot"],
+    "Destinator": ["destinator"],
+    "Triton": ["triton", "strada triton"],
+    "L300": ["l300", "l 300", "elteri"],
+    "L100 EV": ["l100", "l100 ev", "l 100"],
+}
 
 
 def _email(name: str, role: str, admin_email: str) -> str:
@@ -90,9 +115,31 @@ async def seed() -> None:
                     TerritoryMapping(territory_id=territories[name].id, agent_profile_id=agent.id)
                 )
 
+        admin = await session.scalar(select(User).where(User.email == settings.seed_admin_email))
+        for order, (name, aliases) in enumerate(VEHICLE_MODELS.items()):
+            if await session.scalar(select(VehicleModel.id).where(VehicleModel.name == name)):
+                continue
+            session.add(
+                VehicleModel(
+                    name=name,
+                    aliases=aliases,
+                    sort_order=order,
+                    status=KnowledgeStatus.APPROVED,
+                    approved_by_user_id=admin.id if admin else None,
+                    approved_at=datetime.now(UTC),
+                )
+            )
+
         if not await session.scalar(select(KnowledgeBaseArticle.id).limit(1)):
             for title, category, content in KNOWLEDGE:
-                session.add(KnowledgeBaseArticle(title=title, category=category, content=content))
+                session.add(
+                    KnowledgeBaseArticle(
+                        title=title,
+                        category=category,
+                        content=content,
+                        status=KnowledgeStatus.DRAFT,
+                    )
+                )
 
         await session.commit()
     await engine.dispose()

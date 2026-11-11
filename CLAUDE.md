@@ -50,6 +50,13 @@ Ikuti semua aturan di bawah tanpa pengecualian.
 - Pesan masuk dari simulator dan dari webhook WhatsApp **harus** melewati handler
   yang sama (`InboundMessageService`).
 - Proses lambat (panggilan AI, kirim pesan) dijalankan di **background worker**.
+- **AI hanya mengusulkan, backend yang memutuskan** (`services/qualification_service.py`):
+  validasi data, pertanyaan berikutnya, status lead, dan handover tidak boleh diserahkan ke AI.
+- AI hanya boleh memakai knowledge base berstatus `approved` (`KnowledgeService.build_context`).
+  Jangan melemahkan guard angka harga/promo (`ungrounded_amounts`).
+- API key AI (Anthropic/OpenAI) terpisah dari langganan Claude Pro dan hanya disimpan di `.env`.
+- Test skenario memakai `MockAIProvider` (gratis). Jangan menjalankan test terhadap LLM sungguhan
+  (`TEST_AI_PROVIDER=anthropic`) tanpa persetujuan pemilik project karena memakan biaya.
 
 ## Pengaman Development Mode (wajib dijaga)
 
@@ -93,5 +100,6 @@ Migrasi baru: `alembic revision --autogenerate -m "..."`, lalu review hasilnya.
 - Database: `docs/DATABASE_DESIGN.md`
 - API: `docs/API_DESIGN.md`
 - Panduan dev: `docs/DEVELOPMENT_GUIDE.md`
+- AI Agent & knowledge base: `docs/AI_AGENT.md`
 
 Jika implementasi berbeda dari dokumen, perbarui dokumennya dalam commit yang sama.

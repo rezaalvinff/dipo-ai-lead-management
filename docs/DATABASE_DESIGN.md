@@ -3,8 +3,8 @@
 Database: **PostgreSQL 16**. Model: **SQLAlchemy 2.x** (`backend/app/models/`).
 Perubahan skema: **Alembic** (`backend/alembic/versions/`).
 
-> **Status:** sudah diimplementasikan di Phase 1 (migrasi `0001_initial_schema`).
-> Ada 15 tabel. Kolom yang baru dipakai di phase berikutnya sudah disiapkan.
+> **Status:** 20 tabel. Phase 1: migrasi `0001_initial_schema` (15 tabel).
+> Phase 2: migrasi `0002_ai_agent_knowledge_base` (5 tabel baru + kolom knowledge base & lead).
 
 ## Konvensi
 
@@ -33,6 +33,11 @@ erDiagram
     leads }o--o| campaigns : "sumber iklan"
     leads ||--o{ conversion_events : "memicu"
     users ||--o{ audit_logs : "pelaku"
+    leads ||--o| qualification_states : "state percakapan"
+    vehicle_models ||--o{ vehicle_variants : "varian"
+    vehicle_models ||--o{ knowledge_base_articles : "terkait"
+    leads }o--o| vehicle_models : "minat"
+    conversations ||--o{ ai_interactions : "log AI"
 ```
 
 ## Tabel
@@ -115,7 +120,8 @@ Unik per pasangan (territory, agent).
 | full_name | varchar(120) | dikumpulkan AI (phase berikutnya) |
 | domicile_raw | varchar(150) | jawaban domisili apa adanya |
 | territory_id | uuid FK → territories | hasil pencocokan domisili |
-| vehicle_interest | varchar(150) | unit yang diminati |
+| vehicle_interest | varchar(150) | unit yang diminati (nama model hasil validasi) |
+| vehicle_model_id | uuid FK → vehicle_models | model di katalog (Phase 2) |
 | temperature | varchar(10) | `cold` · `warm` (default `cold`) |
 | status | varchar(20) | `new` · `qualifying` · `qualified` · `assigned` · `contacted` · `won` · `lost` |
 | source | varchar(20) | `whatsapp` · `simulator` · `ctwa_ad` (klik iklan WhatsApp) |
@@ -143,7 +149,7 @@ Satu kontak punya satu lead **aktif** (status selain `won`/`lost`).
 | lead_id | uuid FK → leads | |
 | provider | varchar(20) | `simulated` · `whatsapp_cloud` |
 | status | varchar(10) | `open` · `closed` |
-| handler | varchar(20) | `ai` · `admin_queue` · `sales` — AI hanya membalas bila `ai` |
+| handler | varchar(20) | `ai` · `admin_queue` · `sales` · `admin`. AI hanya membalas bila `ai` |
 | assigned_user_id | uuid FK → users | sales/admin pemegang percakapan |
 | last_message_at | timestamptz | |
 | last_inbound_at | timestamptz | untuk aturan jendela 24 jam WhatsApp |
@@ -170,13 +176,17 @@ Satu kontak hanya punya satu percakapan `open`. "Percakapan baru" menutup yang l
 
 Status pesan keluar **tidak pernah mundur** (status `delivered` yang datang terlambat tidak menimpa `read`).
 
-### 12. `knowledge_base_articles` — basis pengetahuan untuk AI
+### 12. `knowledge_base_articles` — promo, DP, angsuran, FAQ, dealer, kebijakan
 | Kolom | Tipe | Keterangan |
 |-------|------|------------|
 | title | varchar(200) | |
-| category | varchar(50) | `vehicle` · `faq` · `promo` · `policy` |
-| content | text | informasi resmi yang boleh dipakai AI |
+| category | varchar(50) | `spec` · `price` · `promo` · `dp` · `installment` · `faq` · `dealer` · `policy` |
+| content | text | informasi resmi |
 | tags | jsonb | |
+| vehicle_model_id | uuid FK → vehicle_models | opsional: khusus model tertentu |
+| valid_from / valid_until | timestamptz | masa berlaku (mis. promo) |
+| status | varchar(15) | `draft` · `approved` · `archived` — **hanya `approved` yang dilihat AI** |
+| approved_by_user_id / approved_at | | siapa & kapan menyetujui |
 | is_active | bool | |
 
 ### 13. `conversion_events` — event konversi iklan
@@ -211,6 +221,64 @@ Di development statusnya selalu `skipped_dev` (logika pengirimannya dibangun di 
 | processed_at | timestamptz | |
 | error | text | |
 
+### 16. `vehicle_models` — katalog model Mitsubishi (Phase 2)
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| name | varchar(100) unique | mis. "Xpander" |
+| category | varchar(50) | `passenger` · `commercial` |
+| aliases | jsonb | ejaan lain/typo: `["expander", "xpender"]` |
+| description | text | deskripsi resmi (opsional) |
+| sort_order | int | |
+| status, approved_by_user_id, approved_at | | alur persetujuan |
+| is_active | bool | |
+
+### 17. `vehicle_variants` — varian, spesifikasi, harga (Phase 2)
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| vehicle_model_id | uuid FK → vehicle_models | |
+| name | varchar(120) | mis. "Ultimate CVT" |
+| transmission / fuel_type | varchar(30) | |
+| specs | jsonb | `{"Mesin": "1.5L", "Kursi": "7"}` |
+| price_otr | numeric(14,0) | harga OTR resmi |
+| price_note | varchar(200) | mis. "OTR Medan, Nov 2026" |
+| status, approved_by_user_id, approved_at | | alur persetujuan |
+| sort_order, is_active | | |
+
+### 18. `qualification_states` — conversation state (Phase 2)
+Satu baris per **lead**, sehingga customer yang kembali tidak ditanya ulang.
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| lead_id | uuid FK → leads, unique | |
+| conversation_id | uuid FK → conversations | percakapan terakhir |
+| stage | varchar(20) | `collecting` · `handed_over` |
+| fields | jsonb | `{"name": {"status": "collected", "value": "Andi", "asks": 1}, "domicile": {...}, "vehicle": {...}}` — status: `missing` · `collected` · `declined` |
+| history | jsonb | daftar perubahan: `collected`, `correction`, `declined`, `unanswered` |
+| last_asked_field | varchar(20) | data yang ditanyakan di balasan terakhir (diputuskan backend) |
+| turns | int | jumlah giliran AI |
+| consecutive_ai_failures | int | untuk handover `ai_unavailable` |
+| handover_reason | varchar(40) | lihat `docs/AI_AGENT.md` |
+| completed_at / handed_over_at | timestamptz | |
+
+### 19. `app_settings` — pengaturan yang bisa diedit admin (Phase 2)
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| key | varchar(80) PK | mis. `qualification.closing_message` |
+| value | jsonb | nilai (default ada di kode; baris hanya ada bila diubah) |
+| description | text | |
+| updated_by_user_id | uuid FK → users | |
+
+### 20. `ai_interactions` — log setiap panggilan AI (Phase 2)
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| conversation_id / message_id | uuid FK | |
+| provider / model | varchar | `mock`, `anthropic`, `openai` |
+| status | varchar(20) | `ok` · `error` · `refusal` |
+| ai_output | jsonb | usulan AI (nilai + draft balasan) |
+| decision | jsonb | keputusan backend (sumber balasan, pertanyaan, handover, nilai ditolak, angka yang diblokir) |
+| input_tokens / output_tokens / latency_ms | int | biaya & kecepatan |
+| error | text | |
+
 ## Penghapusan Data Simulasi
 
 Foreign key memakai `ON DELETE CASCADE`. Menghapus contact dummy otomatis menghapus
@@ -221,8 +289,6 @@ lead, percakapan, pesan, assignment, dan conversion event miliknya. `audit_logs`
 | Tabel | Untuk | Phase |
 |-------|-------|-------|
 | `admin_queue_items` | antrian kasus untuk admin | Admin Queue |
-| `ai_interactions` | log panggilan AI (biaya, kualitas) | AI & kualifikasi lead |
-| `vehicle_units` | katalog unit terstruktur (saat ini cukup knowledge base) | bila dibutuhkan |
 
 ## Catatan Privasi
 

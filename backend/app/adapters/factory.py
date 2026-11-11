@@ -5,7 +5,7 @@ from app.adapters.ai.mock import MockAIProvider
 from app.adapters.whatsapp.base import MessagingProvider
 from app.adapters.whatsapp.cloud import WhatsAppCloudAdapter
 from app.adapters.whatsapp.simulated import SimulatedWhatsAppAdapter
-from app.core.config import Settings, WhatsAppProviderName
+from app.core.config import AIProviderName, Settings, WhatsAppProviderName
 
 
 def build_messaging_provider(settings: Settings) -> MessagingProvider:
@@ -15,8 +15,12 @@ def build_messaging_provider(settings: Settings) -> MessagingProvider:
 
 
 def build_ai_provider(settings: Settings) -> AIProvider:
-    if settings.ai_provider == "mock":
-        return MockAIProvider()
-    raise ValueError(
-        f"AI_PROVIDER '{settings.ai_provider}' is not implemented yet. Use 'mock' for now."
-    )
+    if settings.ai_provider == AIProviderName.ANTHROPIC:
+        from app.adapters.ai.anthropic_provider import AnthropicProvider
+
+        return AnthropicProvider(settings)
+    if settings.ai_provider == AIProviderName.OPENAI:
+        from app.adapters.ai.openai_provider import OpenAIProvider
+
+        return OpenAIProvider(settings)
+    return MockAIProvider()

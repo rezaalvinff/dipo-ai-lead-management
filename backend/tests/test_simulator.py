@@ -73,8 +73,10 @@ async def test_send_message_stores_it_and_ai_replies(client, admin_headers, app)
         ("inbound", "contact"),
         ("outbound", "ai"),
     ]
-    assert "nama" in messages[1]["content"]
-    assert "Mau tanya Xpander" in messages[3]["content"]
+    assert "Selamat datang" in messages[1]["content"]
+    assert "Bapak/Ibu siapa" in messages[1]["content"]
+    # The name is still unknown, so the AI keeps asking for it (no greeting twice).
+    assert "Selamat datang" not in messages[3]["content"]
     for m in messages:
         assert m["created_at_wib"].endswith("WIB")
     for m in messages[1::2]:
@@ -138,7 +140,7 @@ async def test_new_conversation_closes_old_one(client, admin_headers):
     chat = (await client.get(f"{SIM}/contacts/{contact['id']}/chat", headers=admin_headers)).json()
     assert [c["status"] for c in chat["conversations"]] == ["closed", "open"]
     # New conversation starts with a fresh AI greeting.
-    assert "nama" in chat["conversations"][1]["messages"][1]["content"]
+    assert "Selamat datang" in chat["conversations"][1]["messages"][1]["content"]
 
 
 async def test_delete_and_reset(client, admin_headers, app):

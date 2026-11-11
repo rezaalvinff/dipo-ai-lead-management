@@ -3,7 +3,7 @@
 Backend: **FastAPI**. Prefix semua endpoint: `/api/v1`.
 Dokumentasi interaktif (Swagger) tersedia di **http://localhost:8000/docs** (hanya di development).
 
-Legenda: ✅ sudah dibuat (Phase 1) · ⏳ direncanakan
+Legenda: ✅ sudah dibuat · ⏳ direncanakan
 
 ## Konvensi
 
@@ -50,9 +50,38 @@ Legenda: ✅ sudah dibuat (Phase 1) · ⏳ direncanakan
 | ✅ | GET | `/conversations/{id}` | login* | Detail percakapan |
 | ✅ | GET | `/conversations/{id}/messages` | login* | Riwayat pesan, urut dari yang terlama |
 | ✅ | POST | `/conversations/{id}/messages` | login* | Balasan manual `{text}` dari sales/admin, lewat outgoing message service yang sama |
-| ⏳ | POST | `/conversations/{id}/handover` | admin, sales* | Pindah handler: `ai` / `sales` / `admin_queue` |
+| ✅ | GET | `/conversations/{id}/state` | login* | Conversation state: data terkumpul, status tiap data, pertanyaan terakhir, alasan handover, riwayat koreksi |
+| ✅ | POST | `/conversations/{id}/handler` | admin, supervisor | Ambil alih / kembalikan: `{"handler": "ai" \| "admin_queue" \| "admin" \| "sales"}` |
+
+Membalas manual (`POST /conversations/{id}/messages`) otomatis **mengambil alih** percakapan:
+handler menjadi `sales`/`admin` dan AI berhenti membalas.
 
 \* Sales hanya bisa melihat percakapan yang `assigned_user_id`-nya adalah dirinya. Selain itu hasilnya 404.
+
+## 3a. Knowledge Base (Phase 2)
+
+Akses: admin (tulis), supervisor (baca). Data baru berstatus `draft`; hanya `approved` yang dipakai AI.
+Mengubah isi data `approved` mengembalikannya ke `draft` kecuali `status: "approved"` dikirim bersamaan.
+
+| | Method | Path | Fungsi |
+|-|--------|------|--------|
+| ✅ | GET/POST | `/knowledge/vehicle-models` | Daftar / tambah model (`name`, `aliases`, `category`, `description`, `status`) |
+| ✅ | PATCH/DELETE | `/knowledge/vehicle-models/{id}` | Ubah / hapus model (varian ikut terhapus) |
+| ✅ | GET/POST | `/knowledge/vehicle-models/{id}/variants` | Daftar / tambah varian (`name`, `transmission`, `fuel_type`, `specs`, `price_otr`, `price_note`) |
+| ✅ | PATCH/DELETE | `/knowledge/variants/{id}` | Ubah / hapus varian |
+| ✅ | GET/POST | `/knowledge/articles` | Daftar (filter `category`, `status`, `vehicle_model_id`) / tambah artikel promo, DP, angsuran, FAQ, dealer, kebijakan |
+| ✅ | PATCH/DELETE | `/knowledge/articles/{id}` | Ubah / hapus artikel |
+| ✅ | GET | `/knowledge/ai-context?vehicle=` | Pratinjau **persis** informasi yang dilihat AI |
+
+## 3b. Pengaturan Admin (Phase 2)
+
+| | Method | Path | Akses | Fungsi |
+|-|--------|------|-------|--------|
+| ✅ | GET | `/settings` | admin, supervisor | Semua pengaturan + nilai default |
+| ✅ | PUT | `/settings/{key}` | admin | Ubah `{ "value": ... }`. Placeholder pesan: `{nama}`, `{domisili}`, `{unit}` |
+| ✅ | DELETE | `/settings/{key}` | admin | Kembali ke default |
+
+Daftar key: lihat `docs/AI_AGENT.md` bagian 5.
 
 ## 4. Simulator — Simulated WhatsApp (hanya development)
 
@@ -81,7 +110,8 @@ Contoh respons `POST /simulator/contacts/{id}/messages`:
   "message": { "direction": "inbound", "status": "received", "content": "Halo", "created_at_wib": "11/11/2026 12:55:23 WIB" }
 }
 ```
-Balasan AI muncul beberapa saat kemudian. Ambil lewat `GET /simulator/contacts/{id}/chat`.
+Balasan AI muncul beberapa saat kemudian. Ambil lewat `GET /simulator/contacts/{id}/chat`
+(respons ini juga berisi `state`, yaitu conversation state percakapan terakhir).
 
 ## 5. Webhook WhatsApp Cloud API (fondasi, belum aktif dengan nomor asli)
 
@@ -108,7 +138,6 @@ Respons: `{"status":"ok","messages_stored":1,"messages_duplicate":0,"statuses_ap
 | POST | `/leads/{id}/assign` | Assign manual ke sales |
 | GET/POST | `/admin-queue`, `/admin-queue/{id}/claim`, `/admin-queue/{id}/resolve` | Admin Queue |
 | GET/POST | `/territories`, `/territory-mappings` | Master wilayah & pemetaan sales |
-| GET/POST | `/knowledge-base` | Kelola knowledge base AI |
 | GET/POST | `/campaigns` | Kelola campaign |
 | GET | `/stats/overview` | Statistik |
 | WS | `/ws` | Update real-time ke frontend |

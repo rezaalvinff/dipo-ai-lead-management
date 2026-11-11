@@ -21,6 +21,7 @@ from app.schemas.messaging import (
     SimSendResponse,
     SimStatusRequest,
 )
+from app.services.conversation_control import qualification_view
 from app.services.message_service import MessageService
 from app.services.simulator_service import SimulatorService
 
@@ -113,7 +114,8 @@ async def get_chat(
             MessageOut.model_validate(m) for m in await messages.list_for_conversation(conv.id)
         ]
         items.append(item)
-    return SimChatOut(contact=ContactOut.model_validate(contact), conversations=items)
+    state = await qualification_view(session, conversations[-1]) if conversations else None
+    return SimChatOut(contact=ContactOut.model_validate(contact), conversations=items, state=state)
 
 
 @router.post("/messages/{message_id}/status", response_model=MessageOut)

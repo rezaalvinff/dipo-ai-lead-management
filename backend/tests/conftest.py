@@ -66,9 +66,25 @@ def clean_tables(migrated_database):
     engine.dispose()
 
 
+def ai_settings_from_env() -> dict:
+    """TEST_AI_PROVIDER=anthropic|openai runs the scenarios against a REAL LLM (costs money).
+
+    Default (unset) = mock: free, offline, deterministic.
+    """
+    provider = os.environ.get("TEST_AI_PROVIDER", "mock")
+    if provider == "mock":
+        return {}
+    return {
+        "ai_provider": provider,
+        "ai_model": os.environ.get("TEST_AI_MODEL", ""),
+        "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", ""),
+        "openai_api_key": os.environ.get("OPENAI_API_KEY", ""),
+    }
+
+
 @pytest.fixture
 def settings() -> Settings:
-    return make_settings()
+    return make_settings(**ai_settings_from_env())
 
 
 @pytest.fixture
