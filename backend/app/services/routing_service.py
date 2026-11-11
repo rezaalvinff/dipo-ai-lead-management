@@ -45,6 +45,8 @@ class RoutingService:
             lead.temperature = LeadTemperature.COLD
             return {"assigned": False, "reason": "qualification_incomplete"}
 
+        # Flush newly collected qualification fields before refreshing/locking the lead.
+        await self.session.flush()
         # Serialize routing for the same lead and refresh the persisted state.
         await self.session.execute(
             text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"),
