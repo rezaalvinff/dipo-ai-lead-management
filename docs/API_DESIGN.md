@@ -141,3 +141,22 @@ Respons: `{"status":"ok","messages_stored":1,"messages_duplicate":0,"statuses_ap
 | GET/POST | `/campaigns` | Kelola campaign |
 | GET | `/stats/overview` | Statistik |
 | WS | `/ws` | Update real-time ke frontend |
+
+
+## 6. Lead, Cold/Warm & Routing (Phase 3)
+
+Akses daftar lead, riwayat assignment, dan master wilayah: admin/supervisor. Assignment manual: admin saja.
+
+| Method | Path | Fungsi |
+|--------|------|--------|
+| GET | `/leads` | Filter `temperature=cold|warm`, `status`, `domicile`, `agent_profile_id`, `limit` |
+| GET | `/leads/{id}/assignments` | Riwayat assignment, termasuk assignment lama dan alasan |
+| POST | `/leads/{id}/assign` | Assignment manual oleh admin: `{agent_profile_id}` |
+| GET | `/territories` | Daftar wilayah dan alias |
+| POST | `/territories` | Tambah wilayah |
+| PATCH | `/territories/{id}` | Ubah nama, alias, aktif/nonaktif |
+| POST | `/territory-mappings` | Petakan wilayah ke profil sales dengan prioritas |
+| PATCH | `/territory-mappings/{id}` | Ubah prioritas mapping |
+| DELETE | `/territory-mappings/{id}` | Hapus mapping |
+
+**Aturan tag:** `warm` hanya ditetapkan setelah assignment aktif ke profil sales berhasil dipersist. Lead incomplete, wilayah tidak cocok/tidak dipetakan, agent tidak tersedia, atau kapasitas penuh tetap `cold` dan diarahkan ke handler `admin_queue`. Pencocokan memakai nama/alias wilayah secara exact setelah normalisasi; sistem tidak menebak kota sekitar. Admin perlu menambahkan mapping eksplisit untuk cakupan tambahan.
