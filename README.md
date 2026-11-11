@@ -3,9 +3,24 @@
 Sistem manajemen *leads* berbasis AI untuk **Mitsubishi DIPO**, terintegrasi dengan
 **WhatsApp Business** melalui **Meta WhatsApp Cloud API**.
 
-> **Status saat ini: Fase 0 — Fondasi & Dokumentasi.**
-> Belum ada fitur aplikasi yang berjalan. Repository ini baru berisi struktur folder
-> dan dokumen perencanaan. Lihat [ROADMAP.md](ROADMAP.md).
+> **Status saat ini: Phase 4–6 implemented; Phase 7 WhatsApp Cloud readiness** (branch `development`, menunggu review dan pengujian).
+> Dashboard Next.js, inbox, simulator, Admin Queue, lead routing, dan fondasi webhook Cloud API tersedia. Aktivasi nomor sungguhan belum dilakukan karena nomor dan credential Meta belum tersedia. Lihat [ROADMAP.md](ROADMAP.md).
+
+## Mulai Cepat
+
+```bash
+cp .env.example .env
+```
+
+```bash
+docker compose up --build -d
+```
+
+```bash
+docker compose exec backend python -m app.scripts.seed
+```
+
+Lalu buka http://localhost:8000/docs. Langkah lengkap ada di [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md).
 
 ---
 
@@ -52,40 +67,44 @@ dipo-ai-lead-management/
 ├── CLAUDE.md               # Aturan kerja untuk AI assistant (Claude Code)
 ├── README.md               # Dokumen ini
 ├── ROADMAP.md              # Rencana pengembangan per fase
+├── docker-compose.yml      # postgres, redis, migrate, backend, worker
+├── .env.example            # contoh konfigurasi (placeholder saja)
 ├── docs/
 │   ├── ARCHITECTURE.md     # Arsitektur sistem
+│   ├── AI_AGENT.md         # Cara kerja AI Agent, knowledge base, skenario uji
 │   ├── DATABASE_DESIGN.md  # Rancangan tabel database
 │   ├── API_DESIGN.md       # Rancangan endpoint API
 │   └── DEVELOPMENT_GUIDE.md# Panduan pengembangan & testing
 ├── backend/                # Aplikasi FastAPI + worker
 │   ├── app/
 │   │   ├── api/v1/         # Endpoint HTTP (router)
-│   │   ├── core/           # Konfigurasi, keamanan, koneksi DB/Redis
-│   │   ├── models/         # Model tabel (SQLAlchemy)
+│   │   ├── core/           # Konfigurasi & pengaman, DB/Redis, logging, error, JWT
+│   │   ├── models/         # 20 tabel database (SQLAlchemy)
 │   │   ├── schemas/        # Bentuk data request/response (Pydantic)
-│   │   ├── repositories/   # Akses database (query)
 │   │   ├── services/       # Business logic (inti sistem)
 │   │   ├── adapters/
 │   │   │   ├── whatsapp/   # Simulated & WhatsApp Cloud API
-│   │   │   ├── ai/         # Mock AI & AI provider sungguhan
-│   │   │   └── conversion/ # No-op (dev) & Meta Conversions API (prod)
-│   │   └── workers/        # Background job (proses AI, kirim pesan)
+│   │   │   ├── ai/         # Mock AI, Claude (Anthropic API), OpenAI + prompt
+│   │   │   └── conversion/ # (menyusul) No-op & Meta Conversions API
+│   │   ├── workers/        # Antrian job & background worker (ARQ)
+│   │   └── scripts/        # seed data dummy
 │   ├── alembic/            # Migrasi database
-│   └── tests/              # Automated test
+│   └── tests/              # Automated test (pytest)
 ├── frontend/               # Aplikasi Next.js (dashboard & simulator)
-│   └── src/{app,components,lib}
+│   ├── app/                 # Login, inbox, dashboard, simulator, master data
 ├── infra/
-│   ├── docker/             # Dockerfile
+│   ├── docker/             # backend.Dockerfile
 │   └── nginx/              # Reverse proxy untuk VPS
 └── scripts/                # Script bantu (seed data dummy, dll.)
 ```
 
-Folder yang masih kosong berisi file `.gitkeep` agar tetap tercatat di Git.
+Frontend dijalankan sebagai service Docker pada port 3000. Lihat panduan pengembangan untuk cara menjalankan seluruh stack.
 
 ## 5. Dokumentasi
 
 - [ROADMAP.md](ROADMAP.md) — urutan fase pengembangan
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — bagaimana komponen saling terhubung
+- [docs/AI_AGENT.md](docs/AI_AGENT.md) — AI Agent, knowledge base, handover, biaya AI
 - [docs/DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md) — tabel dan relasinya
 - [docs/API_DESIGN.md](docs/API_DESIGN.md) — daftar endpoint
 - [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) — cara menjalankan & menguji

@@ -44,20 +44,28 @@ Ikuti semua aturan di bawah tanpa pengecualian.
   - AI: `MockAIProvider` dan provider LLM sungguhan (interface `AIProvider`).
   - Conversion event: `NoopConversionProvider` dan `MetaConversionProvider`
     (interface `ConversionProvider`).
-- **Business logic hanya ada di `backend/app/services/`.** Endpoint (`api/`), webhook,
+- **Business logic (termasuk query database) hanya ada di `backend/app/services/`.** Endpoint (`api/`), webhook,
   simulator, dan worker hanya memanggil service. Simulator **tidak boleh** punya
   logika bisnis sendiri.
 - Pesan masuk dari simulator dan dari webhook WhatsApp **harus** melewati handler
   yang sama (`InboundMessageService`).
 - Proses lambat (panggilan AI, kirim pesan) dijalankan di **background worker**.
+- **AI hanya mengusulkan, backend yang memutuskan** (`services/qualification_service.py`):
+  validasi data, pertanyaan berikutnya, status lead, dan handover tidak boleh diserahkan ke AI.
+- AI hanya boleh memakai knowledge base berstatus `approved` (`KnowledgeService.build_context`).
+  Jangan melemahkan guard angka harga/promo (`ungrounded_amounts`).
+- API key AI (Anthropic/OpenAI) terpisah dari langganan Claude Pro dan hanya disimpan di `.env`.
+- Test skenario memakai `MockAIProvider` (gratis). Jangan menjalankan test terhadap LLM sungguhan
+  (`TEST_AI_PROVIDER=anthropic`) tanpa persetujuan pemilik project karena memakan biaya.
 
 ## Pengaman Development Mode (wajib dijaga)
 
-- `APP_ENV=development` → aplikasi **wajib** memakai `WHATSAPP_PROVIDER=simulated`
-  dan `CONVERSION_PROVIDER=noop`. Jika konfigurasi lain terdeteksi, aplikasi
-  **menolak start** (fail fast).
-- `WhatsAppCloudAdapter` dan `MetaConversionProvider` wajib mengecek ulang
-  `APP_ENV == "production"` sebelum mengirim apa pun (pengaman lapis kedua).
+- `APP_ENV=development` → aplikasi **wajib** memakai `WHATSAPP_PROVIDER=simulated`,
+  `CONVERSION_PROVIDER=noop`, dan `WHATSAPP_CLOUD_SEND_ENABLED=false`. Jika konfigurasi
+  lain terdeteksi, aplikasi **menolak start** (fail fast) — `app/core/config.py`.
+- Adapter yang menghubungi sistem luar sungguhan wajib memanggil
+  `ensure_real_delivery_allowed()` (`app/core/safety.py`) tepat sebelum mengirim.
+- Nomor simulator wajib berawalan `+62800`.
 - Endpoint `/api/v1/simulator/*` hanya aktif bila `SIMULATOR_ENABLED=true`
   dan **tidak boleh** aktif di production.
 - Jangan pernah menghapus atau melemahkan pengaman ini.
@@ -72,11 +80,26 @@ Ikuti semua aturan di bawah tanpa pengecualian.
 - Nomor telepon disimpan dalam format E.164 (`+628...`).
 - Waktu disimpan dalam UTC (`timestamptz`), ditampilkan dalam WIB di frontend.
 
+## Perintah Penting
+
+Test lokal (butuh PostgreSQL & Redis, lihat `docs/DEVELOPMENT_GUIDE.md`):
+
+```bash
+cd backend && .venv/bin/python -m pytest -q
+```
+
+```bash
+cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check .
+```
+
+Migrasi baru: `alembic revision --autogenerate -m "..."`, lalu review hasilnya.
+
 ## Dokumen Rujukan
 
 - Arsitektur: `docs/ARCHITECTURE.md`
 - Database: `docs/DATABASE_DESIGN.md`
 - API: `docs/API_DESIGN.md`
 - Panduan dev: `docs/DEVELOPMENT_GUIDE.md`
+- AI Agent & knowledge base: `docs/AI_AGENT.md`
 
 Jika implementasi berbeda dari dokumen, perbarui dokumennya dalam commit yang sama.

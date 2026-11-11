@@ -1,210 +1,309 @@
 # Rancangan Database — DIPO AI Lead Management
 
-Database: **PostgreSQL**. Model: **SQLAlchemy 2.x**. Perubahan skema: **Alembic**.
+Database: **PostgreSQL 16**. Model: **SQLAlchemy 2.x** (`backend/app/models/`).
+Perubahan skema: **Alembic** (`backend/alembic/versions/`).
 
-> Ini rancangan awal (Fase 0). Detail kolom bisa disesuaikan di Fase 2,
-> dan dokumen ini akan diperbarui bersamaan.
+> **Status:** 20 tabel. Phase 1: migrasi `0001_initial_schema` (15 tabel).
+> Phase 2: migrasi `0002_ai_agent_knowledge_base` (5 tabel baru + kolom knowledge base & lead).
 
 ## Konvensi
 
 - Primary key: `id` bertipe `UUID`.
-- Setiap tabel punya `created_at` dan `updated_at` (`timestamptz`, UTC).
-- Nomor telepon format **E.164** (`+628123...`).
-- Nilai pilihan (enum) disimpan sebagai `varchar` + validasi di aplikasi,
-  agar mudah ditambah tanpa migrasi rumit.
-- Data customer asli **tidak pernah** dimasukkan ke seed/test.
+- Setiap tabel punya `created_at` dan `updated_at` (`timestamptz`, UTC). Ditampilkan sebagai WIB di API/frontend.
+- Nomor telepon dalam format **E.164** (`+628123...`).
+- Nilai pilihan (enum) disimpan sebagai `varchar`. Daftar nilainya ada di `app/models/enums.py`.
+- Nama constraint dibuat konsisten (`pk_`, `fk_`, `uq_`, `ix_`) agar migrasi mudah diprediksi.
+- Data customer asli **tidak pernah** dimasukkan ke seed/test. Nomor simulasi wajib berawalan `+62800`.
 
 ## Diagram Relasi
 
 ```mermaid
 erDiagram
-    users ||--o{ lead_assignments : "menerima"
-    users ||--o{ messages : "mengirim (sales/admin)"
-    users }o--o{ areas : "melayani (sales_areas)"
-    customers ||--o{ leads : "punya"
-    customers ||--o{ conversations : "punya"
+    roles ||--o{ users : "punya"
+    users ||--o| agent_profiles : "profil sales"
+    agent_profiles ||--o{ territory_mappings : "melayani"
+    territories ||--o{ territory_mappings : "dilayani"
+    contacts ||--o{ leads : "punya"
+    contacts ||--o{ conversations : "punya"
     conversations ||--o{ messages : "berisi"
-    leads ||--o{ lead_assignments : "riwayat assign"
-    leads ||--o{ lead_events : "riwayat perubahan"
-    leads ||--o{ admin_queue_items : "masuk antrian"
-    leads }o--|| vehicle_units : "minat unit"
-    leads }o--o| areas : "domisili"
+    leads |o--o{ conversations : "terkait"
+    leads ||--o{ assignments : "riwayat assign"
+    agent_profiles ||--o{ assignments : "menerima"
+    leads }o--o| territories : "domisili"
+    leads }o--o| campaigns : "sumber iklan"
     leads ||--o{ conversion_events : "memicu"
+    users ||--o{ audit_logs : "pelaku"
+    leads ||--o| qualification_states : "state percakapan"
+    vehicle_models ||--o{ vehicle_variants : "varian"
+    vehicle_models ||--o{ knowledge_base_articles : "terkait"
+    leads }o--o| vehicle_models : "minat"
     conversations ||--o{ ai_interactions : "log AI"
 ```
 
 ## Tabel
 
-### `users` — pengguna dashboard (admin, sales, supervisor)
+### 1. `roles` — peran pengguna (RBAC)
+Diisi otomatis oleh migrasi: `admin`, `supervisor`, `sales`.
+
 | Kolom | Tipe | Keterangan |
 |-------|------|------------|
-| id | uuid PK | |
+| name | varchar(30) unique | nama peran |
+| description | text | penjelasan hak akses |
+
+| Peran | Hak akses (Phase 1) |
+|-------|---------------------|
+| admin | semua, termasuk membuat user dan reset simulator |
+| supervisor | melihat semua percakapan, memakai simulator |
+| sales | hanya percakapan yang ditugaskan kepadanya |
+
+### 2. `users` — pengguna dashboard
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| email | varchar(255) unique | untuk login (disimpan huruf kecil) |
 | full_name | varchar(120) | |
-| email | varchar(255) unique | untuk login |
-| password_hash | varchar(255) | hash (bcrypt/argon2), **bukan** password asli |
-| role | varchar(20) | `admin` · `sales` · `supervisor` |
-| phone_number | varchar(20) null | nomor sales (opsional) |
-| is_active | bool | |
-| max_active_leads | int null | batas beban kerja sales |
-| last_assigned_at | timestamptz null | untuk round-robin |
+| password_hash | varchar(255) | hash **bcrypt**, bukan password asli |
+| role_id | uuid FK → roles | |
+| is_active | bool | user nonaktif tidak bisa login |
+| last_login_at | timestamptz | |
 
-### `areas` — wilayah/domisili untuk routing
+### 3. `agent_profiles` — data khusus sales
+Dibuat otomatis ketika user ber-role `sales` dibuat.
+
 | Kolom | Tipe | Keterangan |
 |-------|------|------------|
-| id | uuid PK | |
-| name | varchar(100) | mis. "Jakarta Selatan" |
-| aliases | jsonb | ejaan lain: `["jaksel", "jkt selatan"]` |
-| is_active | bool | |
+| user_id | uuid FK → users, unique | |
+| display_name | varchar(120) | nama yang tampil ke customer |
+| phone_number | varchar(20) | |
+| is_available | bool | sedang bisa menerima lead |
+| max_active_leads | int | batas beban kerja |
+| last_assigned_at | timestamptz | untuk round-robin |
 
-### `sales_areas` — sales melayani area mana (many-to-many)
+### 4. `territories` — wilayah/domisili
 | Kolom | Tipe | Keterangan |
 |-------|------|------------|
-| user_id | uuid FK → users | |
-| area_id | uuid FK → areas | |
-| priority | int | urutan prioritas |
-
-### `vehicle_units` — katalog unit kendaraan
-| Kolom | Tipe | Keterangan |
-|-------|------|------------|
-| id | uuid PK | |
-| name | varchar(100) | nama unit |
-| category | varchar(50) | mis. `passenger`, `commercial` |
-| aliases | jsonb | ejaan/sebutan lain dari customer |
+| name | varchar(100) unique | mis. "Bekasi" |
+| aliases | jsonb | ejaan lain: `["bks", "bekasi kota"]` |
 | is_active | bool | |
 
-### `customers` — orang yang chat via WhatsApp
+### 5. `territory_mappings` — sales melayani wilayah mana
 | Kolom | Tipe | Keterangan |
 |-------|------|------------|
-| id | uuid PK | |
+| territory_id | uuid FK → territories | |
+| agent_profile_id | uuid FK → agent_profiles | |
+| priority | int | semakin kecil semakin diutamakan |
+
+Unik per pasangan (territory, agent).
+
+### 6. `contacts` — customer WhatsApp
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
 | phone_number | varchar(20) unique | E.164 |
-| wa_id | varchar(32) null | ID WhatsApp dari Meta |
-| profile_name | varchar(120) null | nama profil WhatsApp |
-| is_simulated | bool | **true** untuk customer dummy simulator |
-| opted_out | bool | customer minta berhenti dihubungi |
+| wa_id | varchar(32) | ID WhatsApp dari Meta |
+| display_name | varchar(120) | nama profil / nama dummy |
+| is_simulated | bool, index | **true** = data uji (semua kontak di development) |
+| opted_out | bool | customer minta berhenti dihubungi; pesan keluar diblokir |
 
-### `leads` — prospek penjualan
+### 7. `campaigns` — campaign tracking
 | Kolom | Tipe | Keterangan |
 |-------|------|------------|
-| id | uuid PK | |
-| customer_id | uuid FK → customers | |
-| full_name | varchar(120) null | nama yang dikumpulkan AI |
-| domicile_raw | varchar(150) null | jawaban customer apa adanya |
-| area_id | uuid FK → areas null | hasil pencocokan domisili |
-| vehicle_unit_raw | varchar(150) null | jawaban customer apa adanya |
-| vehicle_unit_id | uuid FK → vehicle_units null | hasil pencocokan unit |
-| temperature | varchar(10) | `cold` · `warm` |
+| name | varchar(150) | |
+| platform | varchar(30) | `meta`, `google`, `offline` |
+| external_campaign_id / external_adset_id / external_ad_id | varchar(64) | ID dari platform iklan |
+| utm | jsonb | parameter UTM |
+| is_active | bool | |
+
+### 8. `leads` — prospek penjualan
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| contact_id | uuid FK → contacts | |
+| campaign_id | uuid FK → campaigns | asal campaign (jika diketahui) |
+| full_name | varchar(120) | dikumpulkan AI (phase berikutnya) |
+| domicile_raw | varchar(150) | jawaban domisili apa adanya |
+| territory_id | uuid FK → territories | hasil pencocokan domisili |
+| vehicle_interest | varchar(150) | unit yang diminati (nama model hasil validasi) |
+| vehicle_model_id | uuid FK → vehicle_models | model di katalog (Phase 2) |
+| temperature | varchar(10) | `cold` · `warm` (default `cold`) |
 | status | varchar(20) | `new` · `qualifying` · `qualified` · `assigned` · `contacted` · `won` · `lost` |
-| assigned_sales_id | uuid FK → users null | sales saat ini |
-| source | varchar(30) | `whatsapp` · `simulator` · `ctwa_ad` (klik iklan) |
-| ad_referral | jsonb null | data iklan dari Meta (jika ada) |
-| qualified_at | timestamptz null | saat data lengkap |
-| is_simulated | bool | ikut dari customer |
+| source | varchar(20) | `whatsapp` · `simulator` · `ctwa_ad` (klik iklan WhatsApp) |
+| ad_referral | jsonb | data `referral` iklan dari webhook Meta |
+| assigned_agent_id | uuid FK → agent_profiles | sales saat ini |
+| qualified_at | timestamptz | |
+| is_simulated | bool | |
 
-### `conversations` — satu utas chat dengan customer
+Satu kontak punya satu lead **aktif** (status selain `won`/`lost`).
+
+### 9. `assignments` — riwayat penugasan lead
 | Kolom | Tipe | Keterangan |
 |-------|------|------------|
-| id | uuid PK | |
-| customer_id | uuid FK → customers | |
-| lead_id | uuid FK → leads null | |
+| lead_id | uuid FK → leads | |
+| agent_profile_id | uuid FK → agent_profiles | |
+| assigned_by_type | varchar(10) | `system` · `user` |
+| assigned_by_user_id | uuid FK → users | |
+| reason | varchar(255) | mis. "territory match: Bekasi" |
+| ended_at | timestamptz | saat dipindah ke sales lain |
+
+### 10. `conversations` — satu utas chat
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| contact_id | uuid FK → contacts | |
+| lead_id | uuid FK → leads | |
 | provider | varchar(20) | `simulated` · `whatsapp_cloud` |
-| handler | varchar(20) | `ai` · `admin_queue` · `sales` · `closed` |
-| assigned_user_id | uuid FK → users null | sales/admin yang memegang |
+| status | varchar(10) | `open` · `closed` |
+| handler | varchar(20) | `ai` · `admin_queue` · `sales` · `admin`. AI hanya membalas bila `ai` |
+| assigned_user_id | uuid FK → users | sales/admin pemegang percakapan |
 | last_message_at | timestamptz | |
-| last_inbound_at | timestamptz null | untuk aturan jendela 24 jam WhatsApp |
+| last_inbound_at | timestamptz | untuk aturan jendela 24 jam WhatsApp |
 | unread_count | int | |
+| closed_at | timestamptz | |
 
-### `messages` — setiap pesan masuk/keluar
+Satu kontak hanya punya satu percakapan `open`. "Percakapan baru" menutup yang lama.
+
+### 11. `messages` — setiap pesan masuk/keluar
 | Kolom | Tipe | Keterangan |
 |-------|------|------------|
-| id | uuid PK | |
 | conversation_id | uuid FK → conversations | |
 | direction | varchar(10) | `inbound` · `outbound` |
-| sender_type | varchar(10) | `customer` · `ai` · `sales` · `admin` · `system` |
-| sender_user_id | uuid FK → users null | bila dikirim sales/admin |
-| message_type | varchar(20) | `text` · `template` · `image` · `interactive` · ... |
+| sender_type | varchar(10) | `contact` · `ai` · `sales` · `admin` · `system` |
+| sender_user_id | uuid FK → users | bila dikirim manusia |
+| provider | varchar(20) | adapter yang dipakai |
+| message_type | varchar(20) | `text`, `image`, `interactive`, ... |
 | content | text | isi pesan |
-| provider_message_id | varchar(128) null unique | ID dari Meta / simulator (anti-duplikat) |
-| status | varchar(15) | `queued` · `sent` · `delivered` · `read` · `failed` · `received` |
-| error_detail | text null | |
-| raw_payload | jsonb null | payload asli (tanpa data rahasia) |
+| provider_message_id | varchar(128) **unique** | `wamid...` dari Meta atau `sim-...` dari simulator — **pelindung duplikat** |
+| status | varchar(15) | masuk: `received`; keluar: `queued` → `sent` → `delivered` → `read`, atau `failed` |
+| error_detail | text | alasan gagal |
+| raw_payload | jsonb | payload asli pesan masuk |
+| sent_at / delivered_at / read_at | timestamptz | waktu setiap status |
 
-Index: `(conversation_id, created_at)`.
+Status pesan keluar **tidak pernah mundur** (status `delivered` yang datang terlambat tidak menimpa `read`).
 
-### `lead_assignments` — riwayat penugasan lead ke sales
+### 12. `knowledge_base_articles` — promo, DP, angsuran, FAQ, dealer, kebijakan
 | Kolom | Tipe | Keterangan |
 |-------|------|------------|
-| id | uuid PK | |
-| lead_id | uuid FK → leads | |
-| sales_id | uuid FK → users | |
-| assigned_by | varchar(10) | `system` · `admin` |
-| assigned_by_user_id | uuid FK → users null | |
-| reason | varchar(255) | mis. "area match: Jakarta Selatan" |
-| ended_at | timestamptz null | saat dipindah ke sales lain |
+| title | varchar(200) | |
+| category | varchar(50) | `spec` · `price` · `promo` · `dp` · `installment` · `faq` · `dealer` · `policy` |
+| content | text | informasi resmi |
+| tags | jsonb | |
+| vehicle_model_id | uuid FK → vehicle_models | opsional: khusus model tertentu |
+| valid_from / valid_until | timestamptz | masa berlaku (mis. promo) |
+| status | varchar(15) | `draft` · `approved` · `archived` — **hanya `approved` yang dilihat AI** |
+| approved_by_user_id / approved_at | | siapa & kapan menyetujui |
+| is_active | bool | |
 
-### `lead_events` — jejak audit perubahan lead
+### 13. `conversion_events` — event konversi iklan
 | Kolom | Tipe | Keterangan |
 |-------|------|------------|
-| id | uuid PK | |
-| lead_id | uuid FK → leads | |
-| event_type | varchar(40) | `field_collected` · `temperature_changed` · `status_changed` · `assigned` · `queued` · ... |
-| old_value | jsonb null | |
-| new_value | jsonb null | |
-| actor_type | varchar(10) | `ai` · `system` · `user` |
-| actor_user_id | uuid FK → users null | |
-
-### `admin_queue_items` — antrian kasus untuk admin
-| Kolom | Tipe | Keterangan |
-|-------|------|------------|
-| id | uuid PK | |
-| lead_id | uuid FK → leads | |
-| conversation_id | uuid FK → conversations | |
-| reason | varchar(30) | `routing_failed` · `human_requested` · `ai_low_confidence` · `complaint` · `other` |
-| note | text null | |
-| priority | int | semakin kecil semakin penting |
-| status | varchar(15) | `open` · `in_progress` · `resolved` |
-| claimed_by_user_id | uuid FK → users null | |
-| resolved_at | timestamptz null | |
-
-### `ai_interactions` — log panggilan AI (untuk evaluasi & biaya)
-| Kolom | Tipe | Keterangan |
-|-------|------|------------|
-| id | uuid PK | |
-| conversation_id | uuid FK → conversations | |
-| message_id | uuid FK → messages null | pesan yang memicu |
-| provider | varchar(30) | `mock` · nama provider LLM |
-| model | varchar(60) | |
-| extracted_fields | jsonb | hasil ekstraksi nama/domisili/unit |
-| confidence | numeric(3,2) null | |
-| input_tokens / output_tokens | int null | |
-| latency_ms | int | |
-| error | text null | |
-
-### `conversion_events` — event konversi untuk Meta
-| Kolom | Tipe | Keterangan |
-|-------|------|------------|
-| id | uuid PK | |
 | lead_id | uuid FK → leads | |
 | event_name | varchar(40) | mis. `Lead`, `QualifiedLead` |
 | provider | varchar(20) | `noop` · `meta_capi` |
 | status | varchar(15) | `pending` · `sent` · `skipped_dev` · `failed` |
-| payload | jsonb | data yang dikirim (data pribadi di-*hash*) |
-| sent_at | timestamptz null | |
+| payload | jsonb | data pribadi di-*hash* sesuai ketentuan Meta |
+| sent_at | timestamptz | |
+| error | text | |
 
-Di Development Mode status selalu `skipped_dev`.
+Di development statusnya selalu `skipped_dev` (logika pengirimannya dibangun di phase berikutnya).
 
-### `webhook_events` — catatan mentah webhook (untuk debug & anti-duplikat)
+### 14. `audit_logs` — jejak audit
 | Kolom | Tipe | Keterangan |
 |-------|------|------------|
-| id | uuid PK | |
-| source | varchar(20) | `whatsapp_cloud` · `simulator` |
-| event_key | varchar(128) unique | kunci idempotensi |
+| actor_type | varchar(10) | `user` · `system` · `ai` · `contact` |
+| actor_user_id | uuid FK → users | |
+| action | varchar(60) | mis. `auth.login`, `user.created`, `lead.created`, `simulator.reset` |
+| entity_type | varchar(40) | |
+| entity_id | varchar(64) | sengaja tanpa FK agar riwayat tetap ada walau data dihapus |
+| data | jsonb | detail tambahan |
+
+### 15. `webhook_events` — catatan mentah webhook
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| source | varchar(20) | `whatsapp_cloud` |
+| event_key | varchar(128) unique | SHA-256 dari body webhook — **pelindung duplikat** |
 | payload | jsonb | |
-| processed_at | timestamptz null | |
-| error | text null | |
+| processed_at | timestamptz | |
+| error | text | |
+
+### 16. `vehicle_models` — katalog model Mitsubishi (Phase 2)
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| name | varchar(100) unique | mis. "Xpander" |
+| category | varchar(50) | `passenger` · `commercial` |
+| aliases | jsonb | ejaan lain/typo: `["expander", "xpender"]` |
+| description | text | deskripsi resmi (opsional) |
+| sort_order | int | |
+| status, approved_by_user_id, approved_at | | alur persetujuan |
+| is_active | bool | |
+
+### 17. `vehicle_variants` — varian, spesifikasi, harga (Phase 2)
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| vehicle_model_id | uuid FK → vehicle_models | |
+| name | varchar(120) | mis. "Ultimate CVT" |
+| transmission / fuel_type | varchar(30) | |
+| specs | jsonb | `{"Mesin": "1.5L", "Kursi": "7"}` |
+| price_otr | numeric(14,0) | harga OTR resmi |
+| price_note | varchar(200) | mis. "OTR Medan, Nov 2026" |
+| status, approved_by_user_id, approved_at | | alur persetujuan |
+| sort_order, is_active | | |
+
+### 18. `qualification_states` — conversation state (Phase 2)
+Satu baris per **lead**, sehingga customer yang kembali tidak ditanya ulang.
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| lead_id | uuid FK → leads, unique | |
+| conversation_id | uuid FK → conversations | percakapan terakhir |
+| stage | varchar(20) | `collecting` · `handed_over` |
+| fields | jsonb | `{"name": {"status": "collected", "value": "Andi", "asks": 1}, "domicile": {...}, "vehicle": {...}}` — status: `missing` · `collected` · `declined` |
+| history | jsonb | daftar perubahan: `collected`, `correction`, `declined`, `unanswered` |
+| last_asked_field | varchar(20) | data yang ditanyakan di balasan terakhir (diputuskan backend) |
+| turns | int | jumlah giliran AI |
+| consecutive_ai_failures | int | untuk handover `ai_unavailable` |
+| handover_reason | varchar(40) | lihat `docs/AI_AGENT.md` |
+| completed_at / handed_over_at | timestamptz | |
+
+### 19. `app_settings` — pengaturan yang bisa diedit admin (Phase 2)
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| key | varchar(80) PK | mis. `qualification.closing_message` |
+| value | jsonb | nilai (default ada di kode; baris hanya ada bila diubah) |
+| description | text | |
+| updated_by_user_id | uuid FK → users | |
+
+### 20. `ai_interactions` — log setiap panggilan AI (Phase 2)
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| conversation_id / message_id | uuid FK | |
+| provider / model | varchar | `mock`, `anthropic`, `openai` |
+| status | varchar(20) | `ok` · `error` · `refusal` |
+| ai_output | jsonb | usulan AI (nilai + draft balasan) |
+| decision | jsonb | keputusan backend (sumber balasan, pertanyaan, handover, nilai ditolak, angka yang diblokir) |
+| input_tokens / output_tokens / latency_ms | int | biaya & kecepatan |
+| error | text | |
+
+## Penghapusan Data Simulasi
+
+Foreign key memakai `ON DELETE CASCADE`. Menghapus contact dummy otomatis menghapus
+lead, percakapan, pesan, assignment, dan conversion event miliknya. `audit_logs` tetap disimpan.
+
+## Rencana Tabel Berikutnya
+
+| Tabel | Untuk | Phase |
+|-------|-------|-------|
+| `admin_queue_items` | antrian kasus untuk admin | Admin Queue |
 
 ## Catatan Privasi
 
-- Kolom berisi data pribadi: `customers.phone_number`, `profile_name`,
-  `leads.full_name`, `messages.content`. Akses dibatasi sesuai role.
-- Payload conversion event: nomor telepon di-*hash* SHA-256 sesuai ketentuan Meta.
+- Kolom berisi data pribadi: `contacts.phone_number`, `display_name`, `leads.full_name`,
+  `messages.content`, `messages.raw_payload`. Akses dibatasi sesuai role.
+- Nomor telepon di log aplikasi disamarkan (`+6280******123`).
 - Kebijakan retensi (berapa lama data disimpan) diputuskan sebelum go-live.
+
+
+## Implementasi Phase 3 — Routing
+
+Phase 3 tidak menambah tabel baru. Sistem menggunakan tabel `territories`, `territory_mappings`, `agent_profiles`, `leads`, dan `assignments` yang sudah ada.
+
+- `leads.temperature` hanya menjadi `warm` saat assignment aktif ke profil sales berhasil dipersist.
+- `leads.assigned_agent_id` menunjuk agent saat ini; `leads.territory_id` menunjuk wilayah yang cocok secara exact.
+- `assignments` menyimpan riwayat; ketika dipindahkan, assignment sebelumnya diberi `ended_at`, lalu baris baru dibuat.
+- Lead yang belum lengkap atau tidak bisa dipetakan/ditugaskan tetap `cold`; percakapan diarahkan ke `admin_queue`.
+- Wilayah tidak otomatis mencakup kota tetangga. Tambahkan alias/mapping hanya setelah cakupan wilayah dikonfirmasi admin.
