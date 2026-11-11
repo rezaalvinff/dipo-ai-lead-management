@@ -77,7 +77,7 @@ class RoutingService:
         if not mappings:
             return await self._send_to_admin_queue(lead, conversation, "territory_without_mapping")
 
-        candidates: list[AgentProfile] = []
+        candidates: list[tuple[int, AgentProfile]] = []
         for mapping in mappings:
             profile = await self.session.scalar(
                 select(AgentProfile)
@@ -98,14 +98,21 @@ class RoutingService:
             )
             if profile.max_active_leads is not None and active_count >= profile.max_active_leads:
                 continue
-            candidates.append(profile)
+            candidates.append((mapping.priority, profile))
 
         if not candidates:
             return await self._send_to_admin_queue(lead, conversation, "no_available_agent")
 
         # Round-robin: select the eligible agent assigned least recently.
-        candidates.sort(key=lambda p: (p.last_assigned_at is not None, p.last_assigned_at or p.created_at, str(p.id)))
-        agent = candidates[0]
+        candidates.sort(
+            key=lambda item: (
+                item[0],
+                item[1].last_assigned_at is not None,
+                item[1].last_assigned_at or item[1].created_at,
+                str(item[1].id),
+            )
+        )
+        agent = candidates[0][1]
         now = datetime.now(UTC)
         await self._persist_assignment(
             lead, conversation, agent, reason=f"territory_match:{territory.name}",
