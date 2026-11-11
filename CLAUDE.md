@@ -44,7 +44,7 @@ Ikuti semua aturan di bawah tanpa pengecualian.
   - AI: `MockAIProvider` dan provider LLM sungguhan (interface `AIProvider`).
   - Conversion event: `NoopConversionProvider` dan `MetaConversionProvider`
     (interface `ConversionProvider`).
-- **Business logic hanya ada di `backend/app/services/`.** Endpoint (`api/`), webhook,
+- **Business logic (termasuk query database) hanya ada di `backend/app/services/`.** Endpoint (`api/`), webhook,
   simulator, dan worker hanya memanggil service. Simulator **tidak boleh** punya
   logika bisnis sendiri.
 - Pesan masuk dari simulator dan dari webhook WhatsApp **harus** melewati handler
@@ -53,11 +53,12 @@ Ikuti semua aturan di bawah tanpa pengecualian.
 
 ## Pengaman Development Mode (wajib dijaga)
 
-- `APP_ENV=development` → aplikasi **wajib** memakai `WHATSAPP_PROVIDER=simulated`
-  dan `CONVERSION_PROVIDER=noop`. Jika konfigurasi lain terdeteksi, aplikasi
-  **menolak start** (fail fast).
-- `WhatsAppCloudAdapter` dan `MetaConversionProvider` wajib mengecek ulang
-  `APP_ENV == "production"` sebelum mengirim apa pun (pengaman lapis kedua).
+- `APP_ENV=development` → aplikasi **wajib** memakai `WHATSAPP_PROVIDER=simulated`,
+  `CONVERSION_PROVIDER=noop`, dan `WHATSAPP_CLOUD_SEND_ENABLED=false`. Jika konfigurasi
+  lain terdeteksi, aplikasi **menolak start** (fail fast) — `app/core/config.py`.
+- Adapter yang menghubungi sistem luar sungguhan wajib memanggil
+  `ensure_real_delivery_allowed()` (`app/core/safety.py`) tepat sebelum mengirim.
+- Nomor simulator wajib berawalan `+62800`.
 - Endpoint `/api/v1/simulator/*` hanya aktif bila `SIMULATOR_ENABLED=true`
   dan **tidak boleh** aktif di production.
 - Jangan pernah menghapus atau melemahkan pengaman ini.
@@ -71,6 +72,20 @@ Ikuti semua aturan di bawah tanpa pengecualian.
 - Perubahan skema database **selalu** lewat migrasi Alembic.
 - Nomor telepon disimpan dalam format E.164 (`+628...`).
 - Waktu disimpan dalam UTC (`timestamptz`), ditampilkan dalam WIB di frontend.
+
+## Perintah Penting
+
+Test lokal (butuh PostgreSQL & Redis, lihat `docs/DEVELOPMENT_GUIDE.md`):
+
+```bash
+cd backend && .venv/bin/python -m pytest -q
+```
+
+```bash
+cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check .
+```
+
+Migrasi baru: `alembic revision --autogenerate -m "..."`, lalu review hasilnya.
 
 ## Dokumen Rujukan
 

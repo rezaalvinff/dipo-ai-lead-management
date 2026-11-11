@@ -3,9 +3,25 @@
 Sistem manajemen *leads* berbasis AI untuk **Mitsubishi DIPO**, terintegrasi dengan
 **WhatsApp Business** melalui **Meta WhatsApp Cloud API**.
 
-> **Status saat ini: Fase 0 — Fondasi & Dokumentasi.**
-> Belum ada fitur aplikasi yang berjalan. Repository ini baru berisi struktur folder
-> dan dokumen perencanaan. Lihat [ROADMAP.md](ROADMAP.md).
+> **Status saat ini: Phase 1 — Backend, Database, Simulated WhatsApp** (menunggu persetujuan).
+> Backend API, database, worker, dan simulator WhatsApp sudah bisa dijalankan.
+> Frontend belum dibuat. Lihat [ROADMAP.md](ROADMAP.md).
+
+## Mulai Cepat
+
+```bash
+cp .env.example .env
+```
+
+```bash
+docker compose up --build -d
+```
+
+```bash
+docker compose exec backend python -m app.scripts.seed
+```
+
+Lalu buka http://localhost:8000/docs. Langkah lengkap ada di [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md).
 
 ---
 
@@ -52,6 +68,8 @@ dipo-ai-lead-management/
 ├── CLAUDE.md               # Aturan kerja untuk AI assistant (Claude Code)
 ├── README.md               # Dokumen ini
 ├── ROADMAP.md              # Rencana pengembangan per fase
+├── docker-compose.yml      # postgres, redis, migrate, backend, worker
+├── .env.example            # contoh konfigurasi (placeholder saja)
 ├── docs/
 │   ├── ARCHITECTURE.md     # Arsitektur sistem
 │   ├── DATABASE_DESIGN.md  # Rancangan tabel database
@@ -60,22 +78,22 @@ dipo-ai-lead-management/
 ├── backend/                # Aplikasi FastAPI + worker
 │   ├── app/
 │   │   ├── api/v1/         # Endpoint HTTP (router)
-│   │   ├── core/           # Konfigurasi, keamanan, koneksi DB/Redis
-│   │   ├── models/         # Model tabel (SQLAlchemy)
+│   │   ├── core/           # Konfigurasi & pengaman, DB/Redis, logging, error, JWT
+│   │   ├── models/         # 15 tabel database (SQLAlchemy)
 │   │   ├── schemas/        # Bentuk data request/response (Pydantic)
-│   │   ├── repositories/   # Akses database (query)
 │   │   ├── services/       # Business logic (inti sistem)
 │   │   ├── adapters/
 │   │   │   ├── whatsapp/   # Simulated & WhatsApp Cloud API
-│   │   │   ├── ai/         # Mock AI & AI provider sungguhan
-│   │   │   └── conversion/ # No-op (dev) & Meta Conversions API (prod)
-│   │   └── workers/        # Background job (proses AI, kirim pesan)
+│   │   │   ├── ai/         # Mock AI (AI sungguhan menyusul)
+│   │   │   └── conversion/ # (menyusul) No-op & Meta Conversions API
+│   │   ├── workers/        # Antrian job & background worker (ARQ)
+│   │   └── scripts/        # seed data dummy
 │   ├── alembic/            # Migrasi database
-│   └── tests/              # Automated test
-├── frontend/               # Aplikasi Next.js (dashboard & simulator)
+│   └── tests/              # Automated test (pytest)
+├── frontend/               # (Phase 5) Aplikasi Next.js (dashboard & simulator)
 │   └── src/{app,components,lib}
 ├── infra/
-│   ├── docker/             # Dockerfile
+│   ├── docker/             # backend.Dockerfile
 │   └── nginx/              # Reverse proxy untuk VPS
 └── scripts/                # Script bantu (seed data dummy, dll.)
 ```

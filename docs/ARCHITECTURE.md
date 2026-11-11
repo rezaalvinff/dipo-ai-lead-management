@@ -55,31 +55,49 @@ digantikan oleh simulator dan pencatat log — tidak ada koneksi ke Meta sama se
 ## 3. Lapisan di Dalam Backend
 
 ```
-api/ (endpoint, webhook, simulator)     ← hanya menerima & memvalidasi input
+api/v1/ (endpoint, webhook, simulator)   ← hanya menerima & memvalidasi input, cek login/role
         │
         ▼
-services/ (BUSINESS LOGIC)              ← satu-satunya tempat aturan bisnis
+services/ (BUSINESS LOGIC)               ← satu-satunya tempat aturan bisnis + query database
         │
    ┌────┴──────────────┐
    ▼                   ▼
-repositories/      adapters/            ← akses database | akses sistem luar
+models/ (SQLAlchemy)  adapters/          ← tabel database | akses sistem luar
    │                   │
    ▼                   ▼
 PostgreSQL        WhatsApp / AI / Conversion
 ```
 
-Service utama yang direncanakan:
+Catatan: folder `repositories/` dari rencana awal **tidak dipakai**. Query database
+ditulis langsung di service agar struktur lebih sederhana.
+
+| Folder | Isi |
+|--------|-----|
+| `app/core/` | konfigurasi & pengaman, database, Redis, logging, error, keamanan (JWT/bcrypt), `AppContext` |
+| `app/models/` | 15 tabel (lihat `DATABASE_DESIGN.md`) |
+| `app/schemas/` | bentuk data request/response (Pydantic) |
+| `app/services/` | business logic |
+| `app/adapters/` | WhatsApp (simulated, cloud), AI (mock) |
+| `app/workers/` | antrian job (ARQ / inline) & worker |
+| `app/api/v1/` | endpoint HTTP |
+| `app/scripts/seed.py` | data dummy |
+
+Service yang **sudah ada** (Phase 1):
 
 | Service | Tanggung jawab |
 |---------|----------------|
-| `InboundMessageService` | Satu pintu untuk **semua** pesan masuk (dari webhook maupun simulator). Simpan pesan, cari/buat customer & percakapan, kirim job ke worker. |
-| `ConversationService` | Mengatur status percakapan: ditangani AI, menunggu admin, ditangani sales, selesai. |
-| `LeadQualificationService` | Bersama AI mengumpulkan **nama, domisili, unit**, dan menyimpan hasilnya. |
-| `LeadTaggingService` | Menentukan tag **Cold/Warm** berdasarkan aturan yang jelas. |
-| `RoutingService` | Memilih sales yang tepat (berdasarkan area & beban kerja). |
-| `AdminQueueService` | Mengelola antrian kasus yang butuh campur tangan admin. |
-| `OutboundMessageService` | Mengirim balasan (AI/sales/admin) lewat `MessagingProvider` yang aktif. |
-| `ConversionEventService` | Mencatat dan mengirim conversion event lewat `ConversionProvider`. |
+| `InboundMessageService` | Satu pintu untuk **semua** pesan masuk (webhook & simulator): kontak, lead, percakapan, simpan pesan, antrekan balasan AI |
+| `MessageService` | Simpan pesan masuk (anti-duplikat), kirim pesan keluar lewat adapter aktif, terapkan status `sent/delivered/read/failed` |
+| `ConversationService` | Cari/buat percakapan terbuka, mulai percakapan baru |
+| `ContactService`, `LeadService` | Cari/buat kontak & lead aktif |
+| `AutoReplyService` | Ambil riwayat → AI → kirim balasan (dijalankan worker) |
+| `WhatsAppWebhookService` | Proteksi duplikat webhook, parsing, teruskan ke service di atas |
+| `SimulatorService` | Lapisan tipis: membuat `InboundMessage`/`StatusUpdate` palsu lalu memanggil service yang sama |
+| `AuthService`, `UserService` | Login, pembuatan user (+ agent profile untuk sales) |
+| `record_audit` | Menulis `audit_logs` |
+
+Service yang **direncanakan**: `LeadQualificationService`, `LeadTaggingService`,
+`RoutingService`, `AdminQueueService`, `ConversionEventService`.
 
 ## 4. Adapter Pattern
 
@@ -92,8 +110,6 @@ classDiagram
     class MessagingProvider {
         <<interface>>
         +send_text(to, text) SendResult
-        +send_template(to, name, params) SendResult
-        +parse_webhook(payload) list~InboundMessage~
     }
     class SimulatedWhatsAppAdapter
     class WhatsAppCloudAdapter
@@ -102,8 +118,7 @@ classDiagram
 
     class AIProvider {
         <<interface>>
-        +generate_reply(context) AIReply
-        +extract_lead_fields(context) LeadFields
+        +generate_reply(history) AIReply
     }
     class MockAIProvider
     class LLMProvider
@@ -120,6 +135,10 @@ classDiagram
     ConversionProvider <|.. MetaConversionProvider
 ```
 
+Parsing webhook (`parse_webhook`) dan validasi signature (`verify_signature`) ada di
+`adapters/whatsapp/cloud.py` sebagai fungsi murni sehingga bisa diuji dengan payload dummy.
+`send_template` (template message) menyusul saat aktivasi WhatsApp Cloud API.
+
 Adapter dipilih **satu kali** saat aplikasi start, berdasarkan konfigurasi
 (`WHATSAPP_PROVIDER`, `AI_PROVIDER`, `CONVERSION_PROVIDER`).
 
@@ -131,20 +150,22 @@ Adapter dipilih **satu kali** saat aplikasi start, berdasarkan konfigurasi
 Tiga lapis pengaman agar Development Mode **tidak mungkin** mengirim pesan sungguhan
 atau conversion event produksi:
 
-1. **Validasi saat start (fail fast).** Jika `APP_ENV=development` tetapi
-   `WHATSAPP_PROVIDER != simulated` atau `CONVERSION_PROVIDER != noop`,
-   aplikasi menolak berjalan dan menampilkan pesan error.
-2. **Pengecekan di dalam adapter produksi.** `WhatsAppCloudAdapter` dan
-   `MetaConversionProvider` mengecek ulang `APP_ENV == "production"` tepat sebelum
-   mengirim. Jika tidak, pengiriman dibatalkan dan dicatat sebagai error.
-3. **Tanpa credential.** File `.env` development tidak berisi token Meta.
-   Tanpa token, panggilan ke Meta pasti gagal.
+1. **Validasi saat start (fail fast)** — `app/core/config.py`. Jika `APP_ENV=development`
+   tetapi `WHATSAPP_PROVIDER != simulated`, `CONVERSION_PROVIDER != noop`, atau
+   `WHATSAPP_CLOUD_SEND_ENABLED=true`, backend dan worker menolak berjalan.
+   Production juga diperiksa: simulator wajib mati, `JWT_SECRET` wajib kuat, credential Meta wajib lengkap.
+2. **Pengecekan di adapter sungguhan** — `app/core/safety.py`. Tepat sebelum mengirim,
+   `WhatsAppCloudAdapter` memastikan `APP_ENV=production` **dan** saklar
+   `WHATSAPP_CLOUD_SEND_ENABLED=true`. Jika tidak, pengiriman dibatalkan dan pesan
+   disimpan berstatus `failed` dengan alasan yang jelas.
+3. **Tanpa credential** — `.env` development tidak berisi token Meta.
 
 Tambahan:
-- Endpoint `/api/v1/simulator/*` hanya terdaftar bila `SIMULATOR_ENABLED=true`;
-  di production nilai ini dipaksa `false`.
-- Customer dummy diberi penanda `is_simulated = true` di database.
-- Frontend menampilkan banner **DEVELOPMENT MODE** yang tidak bisa ditutup.
+- Endpoint `/api/v1/simulator/*` tidak didaftarkan sama sekali di production.
+- Nomor simulator wajib berawalan `+62800` (rentang fiktif).
+- Di development semua kontak (termasuk dari webhook dummy) ditandai `is_simulated = true`.
+- Di development balasan untuk pesan webhook tetap keluar lewat **simulated adapter**.
+- Frontend (phase berikutnya) menampilkan banner **DEVELOPMENT MODE**.
 
 ## 6. Alur Pesan Masuk (sama untuk simulator & produksi)
 
@@ -222,7 +243,7 @@ Secret di VPS disimpan di file `.env` di server (tidak pernah di Git).
 
 | Topik | Pilihan | Diputuskan di |
 |-------|---------|---------------|
-| Library worker | ARQ / RQ / Celery (rekomendasi awal: **ARQ**, ringan & async) | Fase 1 |
-| AI provider LLM | Ditentukan pemilik project | Fase 4 |
-| Real-time | WebSocket atau SSE | Fase 8 |
-| Autentikasi | JWT di cookie httpOnly | Fase 7 |
+| Library worker | ✅ **ARQ** (ringan, async, memakai Redis) | Phase 1 |
+| AI provider LLM | Ditentukan pemilik project | Phase 2 |
+| Real-time | WebSocket atau SSE | Phase 5 |
+| Autentikasi | ✅ JWT (header Bearer atau cookie httpOnly) + RBAC | Phase 1 |
