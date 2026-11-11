@@ -3,8 +3,8 @@
 Sistem manajemen *leads* berbasis AI untuk **Mitsubishi DIPO**, terintegrasi dengan
 **WhatsApp Business** melalui **Meta WhatsApp Cloud API**.
 
-> **Status saat ini: Phase 3 — Cold/Warm Tagging & Sales Routing** (implementasi di branch `development`, menunggu review dan pengujian).
-> Backend, database, simulator WhatsApp, AI Agent, knowledge base, dan fondasi routing tersedia. Frontend belum dibuat. Lihat [ROADMAP.md](ROADMAP.md).
+> **Status saat ini: Phase 4–6 implemented; Phase 7 WhatsApp Cloud readiness** (branch `development`, menunggu review dan pengujian).
+> Dashboard Next.js, inbox, simulator, Admin Queue, lead routing, dan fondasi webhook Cloud API tersedia. Aktivasi nomor sungguhan belum dilakukan karena nomor dan credential Meta belum tersedia. Lihat [ROADMAP.md](ROADMAP.md).
 
 ## Mulai Cepat
 
@@ -90,15 +90,15 @@ dipo-ai-lead-management/
 │   │   └── scripts/        # seed data dummy
 │   ├── alembic/            # Migrasi database
 │   └── tests/              # Automated test (pytest)
-├── frontend/               # (Phase 5) Aplikasi Next.js (dashboard & simulator)
-│   └── src/{app,components,lib}
+├── frontend/               # Aplikasi Next.js (dashboard & simulator)
+│   ├── app/                 # Login, inbox, dashboard, simulator, master data
 ├── infra/
 │   ├── docker/             # backend.Dockerfile
 │   └── nginx/              # Reverse proxy untuk VPS
 └── scripts/                # Script bantu (seed data dummy, dll.)
 ```
 
-Folder yang masih kosong berisi file `.gitkeep` agar tetap tercatat di Git.
+Frontend dijalankan sebagai service Docker pada port 3000. Lihat panduan pengembangan untuk cara menjalankan seluruh stack.
 
 ## 5. Dokumentasi
 
