@@ -158,3 +158,25 @@ Akses daftar lead, riwayat assignment, dan master wilayah: admin/supervisor. Ass
 | DELETE | `/territory-mappings/{id}` | Hapus mapping |
 
 **Aturan tag:** `warm` hanya ditetapkan setelah assignment aktif ke profil sales berhasil dipersist. Lead incomplete, wilayah tidak cocok/tidak dipetakan, agent tidak tersedia, atau kapasitas penuh tetap `cold` dan diarahkan ke handler `admin_queue`. Pencocokan memakai nama/alias wilayah secara exact setelah normalisasi; sistem tidak menebak kota sekitar. Admin perlu menambahkan mapping eksplisit untuk cakupan tambahan.
+
+## 8. Admin Queue, Inbox & Dashboard (Phase 4–6)
+
+| Method | Path | Akses | Fungsi |
+|--------|------|-------|--------|
+| GET | `/admin-queue` | admin, supervisor | Daftar percakapan open dengan handler `admin_queue` beserta alasan handover |
+| POST | `/admin-queue/{conversation_id}/claim` | admin, supervisor | Klaim item dan pindahkan handler ke admin |
+| GET | `/inbox` | login | Inbox diperkaya data customer/lead; sales hanya melihat percakapan yang ditugaskan kepadanya |
+| GET | `/dashboard/summary` | admin, supervisor | KPI leads cold/warm, percakapan aktif, antrean, dan percakapan sales |
+| GET | `/territory-mappings` | admin, supervisor | Daftar mapping wilayah-sales |
+
+Balasan manusia tetap menggunakan `POST /conversations/{id}/messages`. Balasan manual mengambil alih percakapan sehingga AI berhenti. Admin dapat menugaskan lead ke sales melalui `POST /leads/{id}/assign`.
+
+## 9. WhatsApp Cloud API Readiness (Phase 7)
+
+| Method | Path | Akses | Fungsi |
+|--------|------|-------|--------|
+| GET | `/integrations/whatsapp/status` | admin, supervisor | Status konfigurasi tanpa mengembalikan token atau secret |
+| GET | `/webhooks/whatsapp` | Meta webhook | Verification handshake |
+| POST | `/webhooks/whatsapp` | Meta webhook | Pesan masuk, referral, dan status pesan dengan signature validation |
+
+Pengiriman free-form text melalui Cloud API diblokir setelah 24 jam sejak pesan customer terakhir. Template message dan media belum didukung. Pengiriman tetap terkunci kecuali production dan `WHATSAPP_CLOUD_SEND_ENABLED=true`; jangan aktifkan sebelum nomor Meta tersedia dan checklist `docs/WHATSAPP_CLOUD_SETUP.md` selesai.
