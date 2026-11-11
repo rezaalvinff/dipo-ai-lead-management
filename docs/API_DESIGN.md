@@ -146,6 +146,7 @@ Akses daftar lead, riwayat assignment, dan master wilayah: admin/supervisor. Ass
 
 | Method | Path | Fungsi |
 |--------|------|--------|
+| GET | `/agents` | Daftar profil sales, ketersediaan, dan beban lead aktif (`active_only=true` default) |
 | GET | `/leads` | Filter `temperature=cold|warm`, `status`, `domicile`, `agent_profile_id`, `limit` |
 | GET | `/leads/{id}/assignments` | Riwayat assignment, termasuk assignment lama dan alasan |
 | POST | `/leads/{id}/assign` | Assignment manual oleh admin: `{agent_profile_id}` |
