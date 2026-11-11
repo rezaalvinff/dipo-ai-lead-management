@@ -42,5 +42,8 @@ async def whatsapp_status(
             and settings.whatsapp_cloud_send_enabled
             and not settings.simulator_enabled
         ),
-        "note": "Tidak ada token atau secret yang ditampilkan. Pengiriman sungguhan tetap nonaktif sampai aktivasi eksplisit.",
+        "note": (
+            "Tidak ada token atau secret yang ditampilkan. Pengiriman sungguhan "
+            "tetap nonaktif sampai aktivasi eksplisit."
+        ),
     }
