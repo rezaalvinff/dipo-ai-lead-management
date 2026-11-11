@@ -85,7 +85,7 @@ class Settings(BaseSettings):
 
     # --- Meta WhatsApp Cloud API (production only, NEVER commit real values) ---
     whatsapp_api_base_url: str = "https://graph.facebook.com"
-    whatsapp_api_version: str = "v21.0"
+    whatsapp_api_version: str = "v27.0"
     whatsapp_access_token: str = ""
     whatsapp_phone_number_id: str = ""
     whatsapp_app_secret: str = ""
