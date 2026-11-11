@@ -17,8 +17,14 @@ from app.models import (
 )
 from app.models.enums import RoleName
 from app.schemas.routing import (
-    AgentUpdate, ManualAssignRequest, TerritoryCreate, TerritoryMappingCreate, TerritoryMappingOut,
-    TerritoryMappingUpdate, TerritoryOut, TerritoryUpdate,
+    AgentUpdate,
+    ManualAssignRequest,
+    TerritoryCreate,
+    TerritoryMappingCreate,
+    TerritoryMappingOut,
+    TerritoryMappingUpdate,
+    TerritoryOut,
+    TerritoryUpdate,
 )
 from app.services.audit_service import record_audit
 from app.services.routing_service import RoutingService
@@ -48,14 +54,24 @@ async def list_leads(
     if agent_profile_id:
         query = query.where(Lead.assigned_agent_id == agent_profile_id)
     rows = list(await session.scalars(query.limit(limit)))
-    return [{
-        "id": str(x.id), "full_name": x.full_name, "domicile": x.domicile_raw,
-        "vehicle_interest": x.vehicle_interest, "temperature": x.temperature,
-        "status": x.status, "source": x.source,
-        "assigned_agent_id": str(x.assigned_agent_id) if x.assigned_agent_id else None,
-        "territory_id": str(x.territory_id) if x.territory_id else None,
-        "is_simulated": x.is_simulated, "created_at": x.created_at.isoformat(),
-    } for x in rows]
+    return [
+        {
+            "id": str(x.id),
+            "full_name": x.full_name,
+            "domicile": x.domicile_raw,
+            "vehicle_interest": x.vehicle_interest,
+            "temperature": x.temperature,
+            "status": x.status,
+            "source": x.source,
+            "assigned_agent_id": (
+                str(x.assigned_agent_id) if x.assigned_agent_id else None
+            ),
+            "territory_id": str(x.territory_id) if x.territory_id else None,
+            "is_simulated": x.is_simulated,
+            "created_at": x.created_at.isoformat(),
+        }
+        for x in rows
+    ]
 
 
 @router.get("/leads/{lead_id}/assignments")
@@ -67,12 +83,20 @@ async def lead_assignments(
     rows = await session.scalars(
         select(Assignment).where(Assignment.lead_id == lead_id).order_by(Assignment.created_at.desc())
     )
-    return [{
-        "id": str(x.id), "agent_profile_id": str(x.agent_profile_id),
-        "assigned_by_type": x.assigned_by_type, "assigned_by_user_id": str(x.assigned_by_user_id) if x.assigned_by_user_id else None,
-        "reason": x.reason, "created_at": x.created_at.isoformat(),
-        "ended_at": x.ended_at.isoformat() if x.ended_at else None,
-    } for x in rows]
+    return [
+        {
+            "id": str(x.id),
+            "agent_profile_id": str(x.agent_profile_id),
+            "assigned_by_type": x.assigned_by_type,
+            "assigned_by_user_id": (
+                str(x.assigned_by_user_id) if x.assigned_by_user_id else None
+            ),
+            "reason": x.reason,
+            "created_at": x.created_at.isoformat(),
+            "ended_at": x.ended_at.isoformat() if x.ended_at else None,
+        }
+        for x in rows
+    ]
 
 
 @router.post("/leads/{lead_id}/assign")
@@ -81,8 +105,12 @@ async def assign_lead(
     session: AsyncSession = Depends(get_session),
 ):
     lead = await RoutingService(session).manual_assign(lead_id, body.agent_profile_id, user)
-    return {"id": str(lead.id), "temperature": lead.temperature, "status": lead.status,
-            "assigned_agent_id": str(lead.assigned_agent_id)}
+    return {
+        "id": str(lead.id),
+        "temperature": lead.temperature,
+        "status": lead.status,
+        "assigned_agent_id": str(lead.assigned_agent_id),
+    }
 
 
 @router.get("/territories", response_model=list[TerritoryOut])
