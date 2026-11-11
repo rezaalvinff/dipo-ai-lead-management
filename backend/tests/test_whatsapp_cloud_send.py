@@ -66,3 +66,33 @@ async def test_media_message_uses_existing_meta_media_id():
         "id": "MEDIA_ID_DUMMY",
         "caption": "Brosur DIPO",
     }
+
+
+@pytest.mark.asyncio
+async def test_free_form_cloud_message_is_blocked_after_24_hours(app):
+    from datetime import UTC, datetime, timedelta
+    from uuid import uuid4
+
+    from app.core.errors import AppError
+    from app.models import Conversation
+    from app.models.enums import ProviderName, SenderType
+    from app.services.message_service import MessageService
+
+    class CloudStub:
+        name = ProviderName.WHATSAPP_CLOUD
+
+        async def send_text(self, to_phone: str, text: str):
+            raise AssertionError("Cloud provider must not be called outside the service window")
+
+    conversation = Conversation(
+        id=uuid4(),
+        contact_id=uuid4(),
+        last_inbound_at=datetime.now(UTC) - timedelta(hours=25),
+    )
+    async with app.state.ctx.session_factory() as session:
+        with pytest.raises(AppError, match="24 jam"):
+            await MessageService(session, CloudStub()).send_outbound(
+                conversation,
+                "Pesan di luar jendela",
+                sender_type=SenderType.ADMIN,
+            )
