@@ -98,7 +98,8 @@ async def hand_over(
         state.handed_over_at = now
         state.last_asked_field = None
     if lead is not None and reason == HandoverReason.QUALIFICATION_COMPLETE:
-        lead.status = LeadStatus.QUALIFIED
+        # Preserve ASSIGNED after successful routing; otherwise mark qualified.
+        lead.status = LeadStatus.ASSIGNED if lead.assigned_agent_id else LeadStatus.QUALIFIED
         lead.qualified_at = lead.qualified_at or now
     record_audit(
         session,
