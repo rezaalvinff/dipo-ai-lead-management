@@ -122,17 +122,22 @@ async def seed() -> None:
             ("Padang", "Sales Padang Dummy"),
         ):
             agent_user = await session.scalar(select(User).where(User.full_name == agent_name))
-            if agent_user is None or agent_user.agent_profile is None:
+            if agent_user is None:
+                continue
+            agent_profile = await session.scalar(
+                select(AgentProfile).where(AgentProfile.user_id == agent_user.id)
+            )
+            if agent_profile is None:
                 continue
             territory = territories[territory_name]
             exists = await session.scalar(select(TerritoryMapping.id).where(
                 TerritoryMapping.territory_id == territory.id,
-                TerritoryMapping.agent_profile_id == agent_user.agent_profile.id,
+                TerritoryMapping.agent_profile_id == agent_profile.id,
             ))
             if exists is None:
                 session.add(TerritoryMapping(
                     territory_id=territory.id,
-                    agent_profile_id=agent_user.agent_profile.id,
+                    agent_profile_id=agent_profile.id,
                     priority=1,
                 ))
 
