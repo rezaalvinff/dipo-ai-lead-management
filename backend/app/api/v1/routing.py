@@ -123,6 +123,11 @@ async def update_territory(
     return item
 
 
+@router.get("/territory-mappings", response_model=list[TerritoryMappingOut])
+async def list_mappings(_: User = Depends(staff), session: AsyncSession = Depends(get_session)):
+    return list(await session.scalars(select(TerritoryMapping).order_by(TerritoryMapping.priority)))
+
+
 @router.post("/territory-mappings", response_model=TerritoryMappingOut, status_code=201)
 async def create_mapping(
     body: TerritoryMappingCreate, user: User = Depends(admin),
