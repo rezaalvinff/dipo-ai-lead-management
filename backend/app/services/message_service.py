@@ -5,13 +5,14 @@ Used by the simulator AND the WhatsApp Cloud webhook — never duplicated.
 
 import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.whatsapp.base import InboundMessage, MessagingProvider, StatusUpdate
+from app.adapters.whatsapp.base import InboundMessage, MessagingProvider, SendResult, StatusUpdate
 from app.core.errors import AppError
 from app.core.safety import RealDeliveryBlockedError
 from app.models import Contact, Conversation, Message
@@ -124,6 +125,122 @@ class MessageService:
             message.sent_at = now
         conversation.last_message_at = now
         return message
+
+
+    async def _send_special(
+        self,
+        conversation: Conversation,
+        *,
+        message_type: str,
+        content: str,
+        sender_type: SenderType,
+        sender_user_id: uuid.UUID | None,
+        send: Callable[[str], Awaitable[SendResult]],
+    ) -> Message:
+        if self.messaging is None:
+            raise RuntimeError("MessageService needs a MessagingProvider to send")
+        contact = await self.session.get(Contact, conversation.contact_id)
+        if contact is None:
+            raise RuntimeError("Conversation has no contact")
+        message = Message(
+            conversation_id=conversation.id,
+            direction=MessageDirection.OUTBOUND,
+            sender_type=sender_type,
+            sender_user_id=sender_user_id,
+            provider=self.messaging.name,
+            message_type=message_type,
+            content=content,
+            status=MessageStatus.QUEUED,
+        )
+        self.session.add(message)
+        await self.session.flush()
+        if contact.opted_out:
+            message.status = MessageStatus.FAILED
+            message.error_detail = "Contact opted out"
+            return message
+        try:
+            result = await send(contact.phone_number)
+        except RealDeliveryBlockedError as exc:
+            message.status = MessageStatus.FAILED
+            message.error_detail = str(exc)
+            return message
+        message.status = result.status
+        message.error_detail = result.error
+        if result.provider_message_id:
+            message.provider_message_id = result.provider_message_id
+        if result.status == MessageStatus.SENT:
+            message.sent_at = datetime.now(UTC)
+        conversation.last_message_at = datetime.now(UTC)
+        return message
+
+    async def send_template(
+        self,
+        conversation: Conversation,
+        template_name: str,
+        language_code: str,
+        components: list[dict],
+        *,
+        sender_type: SenderType,
+        sender_user_id: uuid.UUID | None = None,
+    ) -> Message:
+        if self.messaging is None or not hasattr(self.messaging, "send_template"):
+            raise AppError(
+                "Template message hanya tersedia pada WhatsApp Cloud API.",
+                code="TEMPLATE_PROVIDER_UNAVAILABLE",
+            )
+        send_template = getattr(self.messaging, "send_template")
+
+        async def send(to_phone: str) -> SendResult:
+            return await send_template(to_phone, template_name, language_code, components)
+
+        return await self._send_special(
+            conversation,
+            message_type="template",
+            content=f"[WhatsApp template: {template_name}]",
+            sender_type=sender_type,
+            sender_user_id=sender_user_id,
+            send=send,
+        )
+
+    async def send_media(
+        self,
+        conversation: Conversation,
+        media_type: str,
+        media_id: str,
+        caption: str | None,
+        filename: str | None,
+        *,
+        sender_type: SenderType,
+        sender_user_id: uuid.UUID | None = None,
+    ) -> Message:
+        if self.messaging is None or not hasattr(self.messaging, "send_media"):
+            raise AppError(
+                "Media message hanya tersedia pada WhatsApp Cloud API.",
+                code="MEDIA_PROVIDER_UNAVAILABLE",
+            )
+        if getattr(self.messaging, "name", None) == ProviderName.WHATSAPP_CLOUD:
+            last_inbound = conversation.last_inbound_at
+            if (
+                last_inbound is None
+                or datetime.now(UTC) - last_inbound > timedelta(hours=24)
+            ):
+                raise AppError(
+                    "Jendela layanan 24 jam telah berakhir. Gunakan template WhatsApp.",
+                    code="WHATSAPP_TEMPLATE_REQUIRED",
+                )
+        send_media = getattr(self.messaging, "send_media")
+
+        async def send(to_phone: str) -> SendResult:
+            return await send_media(to_phone, media_type, media_id, caption, filename)
+
+        return await self._send_special(
+            conversation,
+            message_type=media_type,
+            content=caption or f"[{media_type}]",
+            sender_type=sender_type,
+            sender_user_id=sender_user_id,
+            send=send,
+        )
 
     async def apply_status_update(self, update: StatusUpdate) -> Message | None:
         """Apply sent/delivered/read/failed from the provider. Status never moves backwards."""
