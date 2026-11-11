@@ -1,6 +1,6 @@
 """Seed DUMMY development data:  python -m app.scripts.seed
 
-Creates an admin, a supervisor, two sales agents, sample territories, the
+Creates an admin, a supervisor, five regional sales agents, and sample territories, the
 Mitsubishi model catalog (names only, approved) and DRAFT knowledge placeholders.
 Every name/email/phone here is fictional.
 Refuses to run in production.
