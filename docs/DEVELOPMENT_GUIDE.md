@@ -2,8 +2,7 @@
 
 Panduan ini untuk siapa pun, termasuk non-programmer, yang ingin menjalankan dan menguji aplikasi.
 
-> **Status:** backend Phase 1 sudah bisa dijalankan. Frontend belum ada. Pengujian
-> dilakukan lewat halaman Swagger (`/docs`) atau perintah `curl`.
+> **Status:** backend, frontend dashboard, inbox, simulator, dan fondasi routing tersedia di branch development. Pengujian perlu dilakukan melalui browser dan automated CI.
 
 ## 1. Yang Perlu Di-install
 
@@ -62,8 +61,9 @@ Yang berjalan:
 | `migrate` | Menjalankan migrasi database sekali, lalu berhenti |
 | `backend` | API di http://localhost:8000 |
 | `worker` | Background worker yang membuat balasan AI |
+| `frontend` | Dashboard DIPO di http://localhost:3000 |
 
-Isi data dummy (admin, supervisor, 2 sales, 3 wilayah, katalog model Mitsubishi, placeholder knowledge base):
+Isi data dummy (admin, supervisor, 5 sales regional, 5 wilayah, katalog model Mitsubishi, placeholder knowledge base):
 
 ```bash
 docker compose exec backend python -m app.scripts.seed
@@ -116,7 +116,7 @@ docker compose down -v
 | 6 | Routing ke sales | ⏳ |
 | 7 | Admin Queue (daftar & penanganan) | ⏳ |
 
-Daftar lengkap 24 skenario ada di `docs/AI_AGENT.md`.
+Daftar lengkap 24 skenario ada di `docs/AI_AGENT.md`. Untuk integrasi nomor sungguhan, lihat `docs/WHATSAPP_CLOUD_SETUP.md`; jangan mengaktifkan pengiriman sebelum nomor Meta tersedia dan seluruh checklist lolos.
 
 ### Memakai Claude sungguhan (opsional, berbayar)
 
