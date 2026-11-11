@@ -101,3 +101,16 @@ class QualificationStateOut(BaseModel):
     last_asked_field: str | None
     handover_reason: str | None
     history: list
+
+
+class SendTemplateRequest(BaseModel):
+    template_name: str = Field(min_length=1, max_length=512, pattern="^[a-z0-9_]+$")
+    language_code: str = Field(default="id", min_length=2, max_length=10)
+    components: list[dict] = Field(default_factory=list)
+
+
+class SendMediaRequest(BaseModel):
+    media_type: str = Field(pattern="^(image|video|document|audio)$")
+    media_id: str = Field(min_length=1, max_length=512)
+    caption: str | None = Field(default=None, max_length=1024)
+    filename: str | None = Field(default=None, max_length=255)
