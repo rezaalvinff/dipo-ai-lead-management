@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import auth, conversations, health, knowledge, settings, simulator, webhooks
+from app.api.v1 import auth, conversations, health, knowledge, routing, settings, simulator, webhooks
 from app.core.config import Settings
 
 
@@ -12,6 +12,7 @@ def build_api_router(app_settings: Settings) -> APIRouter:
     router.include_router(webhooks.router)
     router.include_router(knowledge.router)
     router.include_router(settings.router)
+    router.include_router(routing.router)
     # Simulator routes do not even exist in production.
     if app_settings.simulator_enabled and not app_settings.is_production:
         router.include_router(simulator.router)
